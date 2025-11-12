@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "AWS-native ABS Analytics Platform for SEC Filings Analysis",
   "scripts": {
+    "frontend:install": "cd frontend && npm install",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "frontend:preview": "cd frontend && npm run preview",
     "deploy:stack": "aws cloudformation create-stack --stack-name absolution-platform-dev --template-body file://infrastructure/cloudformation/main-stack.yaml --parameters ParameterKey=Environment,ParameterValue=dev --capabilities CAPABILITY_NAMED_IAM",
     "update:stack": "aws cloudformation update-stack --stack-name absolution-platform-dev --template-body file://infrastructure/cloudformation/main-stack.yaml --parameters ParameterKey=Environment,ParameterValue=dev --capabilities CAPABILITY_NAMED_IAM",
     "delete:stack": "aws cloudformation delete-stack --stack-name absolution-platform-dev",
