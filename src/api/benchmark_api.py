@@ -323,14 +323,47 @@ def lambda_handler(event, context):
     api = BenchmarkAPI()
 
     try:
-        # Parse request
-        http_method = event.get('httpMethod', 'GET')
-        path = event.get('path', '')
-        path_parameters = event.get('pathParameters', {}) or {}
-        query_parameters = event.get('queryStringParameters', {}) or {}
+        # Parse request - support both API Gateway v1 and v2
+        # v2 format (HTTP API)
+        if 'requestContext' in event and 'http' in event['requestContext']:
+            http_method = event['requestContext']['http']['method']
+            path = event.get('rawPath', '/')
+            # Remove stage prefix if present (e.g., /dev/path -> /path)
+            stage = event['requestContext'].get('stage', '')
+            if stage and path.startswith(f'/{stage}/'):
+                path = path[len(stage)+1:]
+            elif stage and path == f'/{stage}':
+                path = '/'
+            path_parameters = event.get('pathParameters', {}) or {}
+            query_parameters = event.get('queryStringParameters', {}) or {}
+        # v1 format (REST API)
+        else:
+            http_method = event.get('httpMethod', 'GET')
+            path = event.get('path', '/')
+            path_parameters = event.get('pathParameters', {}) or {}
+            query_parameters = event.get('queryStringParameters', {}) or {}
+
+        logger.info(f"Parsed request - Method: {http_method}, Path: {path}")
 
         # Route handling
-        if path.startswith('/benchmark/issuer/'):
+        if path == '/' or path == '' or path == '/health':
+            # Root path or health check - return API documentation
+            result = {
+                'message': 'ABSolution Benchmark API',
+                'status': 'healthy',
+                'version': '1.0',
+                'endpoints': {
+                    'GET /dev/health': 'Health check',
+                    'GET /dev/benchmark/issuer/{cik}': 'Get benchmark metrics for an issuer',
+                    'GET /dev/benchmark/asset-class/{asset_class}': 'Get benchmark metrics for an asset class',
+                    'GET /dev/benchmark/compare?ciks=cik1,cik2': 'Compare multiple issuers',
+                    'GET /dev/risk-scores?cik={cik}': 'Get risk scores with filters',
+                    'GET /dev/trending?asset_class={class}&days={days}': 'Get trending metrics'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+        elif path.startswith('/benchmark/issuer/'):
             cik = path_parameters.get('cik')
             lookback_days = int(query_parameters.get('lookback_days', 90))
             result = api.get_issuer_benchmark(cik, lookback_days)

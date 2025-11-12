@@ -118,12 +118,52 @@ if aws cloudformation describe-stacks \
         }
 
     if [ $? -ne 254 ]; then
-        print_info "Waiting for stack update to complete..."
-        aws cloudformation wait stack-update-complete \
+        # Check current status immediately
+        STATUS=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
-            --region $AWS_REGION
+            --region $AWS_REGION \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null)
 
-        print_success "Stack updated successfully"
+        if [[ "$STATUS" == "UPDATE_COMPLETE" ]]; then
+            print_success "Stack already up to date"
+        elif [[ "$STATUS" == "UPDATE_IN_PROGRESS" ]]; then
+            print_info "Stack update in progress. Monitoring..."
+            print_info "You can monitor at: https://console.aws.amazon.com/cloudformation/"
+
+            # Wait with timeout and progress updates
+            WAIT_TIMEOUT=600  # 10 minutes
+            ELAPSED=0
+            while [ $ELAPSED -lt $WAIT_TIMEOUT ]; do
+                STATUS=$(aws cloudformation describe-stacks \
+                    --stack-name $STACK_NAME \
+                    --region $AWS_REGION \
+                    --query 'Stacks[0].StackStatus' \
+                    --output text 2>/dev/null)
+
+                if [[ "$STATUS" == "UPDATE_COMPLETE" ]]; then
+                    echo ""
+                    print_success "Stack updated successfully"
+                    break
+                elif [[ "$STATUS" == *"FAILED"* ]] || [[ "$STATUS" == *"ROLLBACK"* ]]; then
+                    echo ""
+                    print_error "Stack update failed with status: $STATUS"
+                    exit 1
+                else
+                    echo -n "."
+                    sleep 10
+                    ELAPSED=$((ELAPSED + 10))
+                fi
+            done
+
+            if [ $ELAPSED -ge $WAIT_TIMEOUT ]; then
+                echo ""
+                print_warning "Update is taking longer than expected. Continuing anyway..."
+                print_info "Check status: aws cloudformation describe-stacks --stack-name $STACK_NAME"
+            fi
+        else
+            print_success "Stack status: $STATUS"
+        fi
     fi
 
 else
@@ -185,18 +225,37 @@ fi
 print_step "Step 6/6: Verifying Deployment"
 
 echo "Fetching stack outputs..."
-OUTPUTS=$(aws cloudformation describe-stacks \
+
+# Parse outputs using AWS CLI query (no jq required)
+API_ENDPOINT=$(aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
-    --query 'Stacks[0].Outputs' \
-    --output json)
+    --query 'Stacks[0].Outputs[?OutputKey==`APIEndpoint`].OutputValue' \
+    --output text)
 
-# Parse outputs
-API_ENDPOINT=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="APIEndpoint") | .OutputValue')
-RAW_BUCKET=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="RawDataBucketName") | .OutputValue')
-PROCESSED_BUCKET=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="ProcessedDataBucketName") | .OutputValue')
-KINESIS_STREAM=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="KinesisStreamName") | .OutputValue')
-FILINGS_TABLE=$(echo $OUTPUTS | jq -r '.[] | select(.OutputKey=="FilingsTableName") | .OutputValue')
+RAW_BUCKET=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`RawDataBucketName`].OutputValue' \
+    --output text)
+
+PROCESSED_BUCKET=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`ProcessedDataBucketName`].OutputValue' \
+    --output text)
+
+KINESIS_STREAM=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`KinesisStreamName`].OutputValue' \
+    --output text)
+
+FILINGS_TABLE=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`FilingsTableName`].OutputValue' \
+    --output text)
 
 # Display outputs
 echo ""
