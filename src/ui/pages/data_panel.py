@@ -75,13 +75,13 @@ def render(data_loader, filters):
         # Form Type filter
         st.markdown("**Form Type**")
         form_types = data_loader.get_form_types()
-        form_type_options = ["All"] + form_types
-        selected_form_type = st.selectbox(
-            "Select Form Type",
-            form_type_options,
-            index=0
+        selected_form_types = st.multiselect(
+            "Select Form Types",
+            form_types,
+            default=None,
+            placeholder="All form types"
         )
-        filters['form_type'] = selected_form_type
+        filters['form_type'] = selected_form_types if selected_form_types else None
 
     with col3:
         # Company filter
@@ -89,17 +89,18 @@ def render(data_loader, filters):
         companies = data_loader.get_unique_companies()
 
         if companies:
-            company_options = ["All"] + [f"{c['company_name']} ({c['cik']})" for c in companies]
-            selected_company = st.selectbox(
-                "Select Company",
+            company_options = [f"{c['company_name']} ({c['cik']})" for c in companies]
+            selected_companies = st.multiselect(
+                "Select Companies",
                 company_options,
-                index=0
+                default=None,
+                placeholder="All companies"
             )
 
-            if selected_company != "All":
-                # Extract CIK from selection
-                cik = selected_company.split("(")[-1].strip(")")
-                filters['company'] = cik
+            if selected_companies:
+                # Extract CIKs from selections
+                ciks = [comp.split("(")[-1].strip(")") for comp in selected_companies]
+                filters['company'] = ciks
             else:
                 filters['company'] = None
         else:
@@ -114,7 +115,7 @@ def render(data_loader, filters):
     with col2:
         if st.button("🗑️ Reset Filters", use_container_width=True):
             filters['asset_class'] = 'All'
-            filters['form_type'] = 'All'
+            filters['form_type'] = None
             filters['company'] = None
             st.rerun()
 
@@ -126,8 +127,8 @@ def render(data_loader, filters):
             start_date=filters['start_date'].strftime('%Y-%m-%d') if isinstance(filters['start_date'], datetime) else str(filters['start_date']),
             end_date=filters['end_date'].strftime('%Y-%m-%d') if isinstance(filters['end_date'], datetime) else str(filters['end_date']),
             asset_class=filters['asset_class'] if filters['asset_class'] != "All" else None,
-            form_type=filters['form_type'] if filters['form_type'] != "All" else None,
-            cik=filters['company']
+            form_types=filters['form_type'],  # Now accepts list
+            ciks=filters['company']  # Now accepts list
         )
 
     # Display summary metrics
