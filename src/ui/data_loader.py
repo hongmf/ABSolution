@@ -52,8 +52,8 @@ class ABSDataLoader:
                    start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
                    asset_class: Optional[str] = None,
-                   form_type: Optional[str] = None,
-                   cik: Optional[str] = None) -> pd.DataFrame:
+                   form_types: Optional[List[str]] = None,
+                   ciks: Optional[List[str]] = None) -> pd.DataFrame:
         """
         Load SEC filings with filters
 
@@ -61,53 +61,54 @@ class ABSDataLoader:
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
             asset_class: Filter by asset class
-            form_type: Filter by form type
-            cik: Filter by CIK
+            form_types: Filter by form types (list)
+            ciks: Filter by CIKs (list)
 
         Returns:
             DataFrame with filing data
         """
         if _self.use_mock_data:
-            return _self._get_mock_filings(start_date, end_date, asset_class, form_type, cik)
+            return _self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
 
         try:
-            # Build filter expression
-            filter_expressions = []
-
-            if start_date:
-                filter_expressions.append(f"filing_date >= :start_date")
-            if end_date:
-                filter_expressions.append(f"filing_date <= :end_date")
-            if asset_class and asset_class != "All":
-                filter_expressions.append(f"asset_class = :asset_class")
-            if form_type and form_type != "All":
-                filter_expressions.append(f"form_type = :form_type")
-            if cik:
-                filter_expressions.append(f"cik = :cik")
-
             # Query DynamoDB
             scan_kwargs = {}
-            if filter_expressions:
-                from boto3.dynamodb.conditions import Attr
-                filter_expr = None
-                for expr in filter_expressions:
-                    condition = None
-                    if "start_date" in expr:
-                        condition = Attr('filing_date').gte(start_date)
-                    elif "end_date" in expr:
-                        condition = Attr('filing_date').lte(end_date)
-                    elif "asset_class" in expr:
-                        condition = Attr('asset_class').eq(asset_class)
-                    elif "form_type" in expr:
-                        condition = Attr('form_type').eq(form_type)
-                    elif "cik" in expr:
-                        condition = Attr('cik').eq(cik)
+            from boto3.dynamodb.conditions import Attr
 
-                    if condition:
-                        filter_expr = condition if filter_expr is None else filter_expr & condition
+            filter_expr = None
 
-                if filter_expr:
-                    scan_kwargs['FilterExpression'] = filter_expr
+            if start_date:
+                condition = Attr('filing_date').gte(start_date)
+                filter_expr = condition if filter_expr is None else filter_expr & condition
+
+            if end_date:
+                condition = Attr('filing_date').lte(end_date)
+                filter_expr = condition if filter_expr is None else filter_expr & condition
+
+            if asset_class and asset_class != "All":
+                condition = Attr('asset_class').eq(asset_class)
+                filter_expr = condition if filter_expr is None else filter_expr & condition
+
+            if form_types:
+                # Create OR condition for multiple form types
+                form_condition = None
+                for ft in form_types:
+                    cond = Attr('form_type').eq(ft)
+                    form_condition = cond if form_condition is None else form_condition | cond
+                if form_condition:
+                    filter_expr = form_condition if filter_expr is None else filter_expr & form_condition
+
+            if ciks:
+                # Create OR condition for multiple CIKs
+                cik_condition = None
+                for c in ciks:
+                    cond = Attr('cik').eq(c)
+                    cik_condition = cond if cik_condition is None else cik_condition | cond
+                if cik_condition:
+                    filter_expr = cik_condition if filter_expr is None else filter_expr & cik_condition
+
+            if filter_expr:
+                scan_kwargs['FilterExpression'] = filter_expr
 
             response = _self.filings_table.scan(**scan_kwargs)
             items = response.get('Items', [])
@@ -129,9 +130,9 @@ class ABSDataLoader:
 
         except Exception as e:
             logger.error(f"Error loading filings: {e}")
-            return _self._get_mock_filings(start_date, end_date, asset_class, form_type, cik)
+            return _self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
 
-    def _get_mock_filings(_self, start_date=None, end_date=None, asset_class=None, form_type=None, cik=None) -> pd.DataFrame:
+    def _get_mock_filings(_self, start_date=None, end_date=None, asset_class=None, form_types=None, ciks=None) -> pd.DataFrame:
         """Generate mock filing data for testing"""
         import numpy as np
         from datetime import datetime, timedelta
@@ -211,10 +212,10 @@ class ABSDataLoader:
             df = df[df['filing_date'] <= end_date]
         if asset_class and asset_class != "All":
             df = df[df['asset_class'] == asset_class]
-        if form_type and form_type != "All":
-            df = df[df['form_type'] == form_type]
-        if cik:
-            df = df[df['cik'] == cik]
+        if form_types:
+            df = df[df['form_type'].isin(form_types)]
+        if ciks:
+            df = df[df['cik'].isin(ciks)]
 
         return df
 

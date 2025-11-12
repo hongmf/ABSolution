@@ -28,13 +28,13 @@ def render(data_loader, filters):
             start_date=filters['start_date'].strftime('%Y-%m-%d') if isinstance(filters['start_date'], datetime) else str(filters['start_date']),
             end_date=filters['end_date'].strftime('%Y-%m-%d') if isinstance(filters['end_date'], datetime) else str(filters['end_date']),
             asset_class=filters['asset_class'] if filters['asset_class'] != "All" else None,
-            form_type=filters['form_type'] if filters['form_type'] != "All" else None,
-            cik=filters['company']
+            form_types=filters['form_type'],  # Now accepts list
+            ciks=filters['company']  # Now accepts list
         )
 
-        # Load risk scores
+        # Load risk scores - pass first CIK if multiple selected
         risk_df = data_loader.get_risk_scores(
-            cik=filters['company'],
+            cik=filters['company'][0] if filters['company'] and isinstance(filters['company'], list) else filters['company'],
             asset_class=filters['asset_class'] if filters['asset_class'] != "All" else None
         )
 
