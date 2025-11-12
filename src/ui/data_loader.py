@@ -1,333 +1,245 @@
 """
-Data Loader for Streamlit UI
-Handles data retrieval from AWS services (DynamoDB, S3) with caching
+Data loader for ABSolution Streamlit dashboard
 """
-
-import boto3
-import pandas as pd
-import json
 import streamlit as st
-from datetime import datetime, timedelta
-from decimal import Decimal
+import pandas as pd
+import boto3
 from typing import List, Dict, Optional
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-class DecimalEncoder(json.JSONEncoder):
-    """Helper to convert Decimal to float for JSON serialization"""
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super(DecimalEncoder, self).default(obj)
+from datetime import datetime, timedelta
 
 
 class ABSDataLoader:
-    """Loads ABS filing data from AWS services"""
+    """
+    Data loader for ABS analytics dashboard.
+    Handles data retrieval from DynamoDB, S3, and other AWS services.
+    """
 
-    def __init__(self, use_mock_data=False):
+    def __init__(self, region: str = 'us-east-1'):
         """
-        Initialize data loader
+        Initialize the data loader with AWS clients.
 
         Args:
-            use_mock_data: If True, use mock data instead of AWS
+            region: AWS region for services
         """
-        self.use_mock_data = use_mock_data
+        self.region = region
+        self.dynamodb = boto3.resource('dynamodb', region_name=region)
+        self.s3 = boto3.client('s3', region_name=region)
+        self.filings_table = self.dynamodb.Table('abs-filings')
+        self.risk_scores_table = self.dynamodb.Table('abs-risk-scores')
 
-        if not use_mock_data:
-            try:
-                self.dynamodb = boto3.resource('dynamodb')
-                self.s3_client = boto3.client('s3')
-                self.filings_table = self.dynamodb.Table('abs-filings')
-                self.risk_table = self.dynamodb.Table('abs-risk-scores')
-            except Exception as e:
-                logger.warning(f"Could not connect to AWS: {e}. Using mock data.")
-                self.use_mock_data = True
-
-    @st.cache_data(ttl=300)  # Cache for 5 minutes
-    def get_filings(self,
-                   start_date: Optional[str] = None,
-                   end_date: Optional[str] = None,
-                   asset_class: Optional[str] = None,
-                   form_types: Optional[List[str]] = None,
-                   ciks: Optional[List[str]] = None) -> pd.DataFrame:
+    @st.cache_data(ttl=3600)
+    def get_asset_classes(_self) -> List[str]:
         """
-        Load SEC filings with filters
+        Get list of unique asset classes from DynamoDB.
+
+        Note: Using _self instead of self to prevent Streamlit from trying to hash
+        the class instance, which would cause UnhashableParamError.
+
+        Returns:
+            List of asset class names
+        """
+        try:
+            response = _self.filings_table.scan(
+                ProjectionExpression='asset_class'
+            )
+
+            asset_classes = set()
+            for item in response.get('Items', []):
+                if 'asset_class' in item:
+                    asset_classes.add(item['asset_class'])
+
+            # Handle pagination
+            while 'LastEvaluatedKey' in response:
+                response = _self.filings_table.scan(
+                    ProjectionExpression='asset_class',
+                    ExclusiveStartKey=response['LastEvaluatedKey']
+                )
+                for item in response.get('Items', []):
+                    if 'asset_class' in item:
+                        asset_classes.add(item['asset_class'])
+
+            return sorted(list(asset_classes))
+        except Exception as e:
+            st.error(f"Error fetching asset classes: {str(e)}")
+            return []
+
+    @st.cache_data(ttl=3600)
+    def get_issuers(_self, asset_class: Optional[str] = None) -> List[str]:
+        """
+        Get list of unique issuers, optionally filtered by asset class.
 
         Args:
-            start_date: Start date (YYYY-MM-DD)
-            end_date: End date (YYYY-MM-DD)
-            asset_class: Filter by asset class
-            form_types: Filter by form types (list)
-            ciks: Filter by CIKs (list)
+            asset_class: Optional asset class filter
+
+        Returns:
+            List of issuer names
+        """
+        try:
+            scan_kwargs = {
+                'ProjectionExpression': 'issuer_name'
+            }
+
+            if asset_class:
+                scan_kwargs['FilterExpression'] = 'asset_class = :ac'
+                scan_kwargs['ExpressionAttributeValues'] = {':ac': asset_class}
+
+            response = _self.filings_table.scan(**scan_kwargs)
+
+            issuers = set()
+            for item in response.get('Items', []):
+                if 'issuer_name' in item:
+                    issuers.add(item['issuer_name'])
+
+            # Handle pagination
+            while 'LastEvaluatedKey' in response:
+                scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+                response = _self.filings_table.scan(**scan_kwargs)
+                for item in response.get('Items', []):
+                    if 'issuer_name' in item:
+                        issuers.add(item['issuer_name'])
+
+            return sorted(list(issuers))
+        except Exception as e:
+            st.error(f"Error fetching issuers: {str(e)}")
+            return []
+
+    @st.cache_data(ttl=600)
+    def get_recent_filings(_self,
+                          days: int = 30,
+                          asset_class: Optional[str] = None,
+                          issuer: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get recent SEC filings with optional filters.
+
+        Args:
+            days: Number of days to look back
+            asset_class: Optional asset class filter
+            issuer: Optional issuer filter
 
         Returns:
             DataFrame with filing data
         """
-        if self.use_mock_data:
-            return self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
-
         try:
-            # Query DynamoDB
-            scan_kwargs = {}
-            from boto3.dynamodb.conditions import Attr
+            cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
 
-            filter_expr = None
+            scan_kwargs = {
+                'FilterExpression': 'filing_date >= :cutoff',
+                'ExpressionAttributeValues': {':cutoff': cutoff_date}
+            }
 
-            if start_date:
-                condition = Attr('filing_date').gte(start_date)
-                filter_expr = condition if filter_expr is None else filter_expr & condition
+            # Add additional filters
+            if asset_class:
+                scan_kwargs['FilterExpression'] += ' AND asset_class = :ac'
+                scan_kwargs['ExpressionAttributeValues'][':ac'] = asset_class
 
-            if end_date:
-                condition = Attr('filing_date').lte(end_date)
-                filter_expr = condition if filter_expr is None else filter_expr & condition
+            if issuer:
+                scan_kwargs['FilterExpression'] += ' AND issuer_name = :issuer'
+                scan_kwargs['ExpressionAttributeValues'][':issuer'] = issuer
 
-            if asset_class and asset_class != "All":
-                condition = Attr('asset_class').eq(asset_class)
-                filter_expr = condition if filter_expr is None else filter_expr & condition
-
-            if form_types:
-                # Create OR condition for multiple form types
-                form_condition = None
-                for ft in form_types:
-                    cond = Attr('form_type').eq(ft)
-                    form_condition = cond if form_condition is None else form_condition | cond
-                if form_condition:
-                    filter_expr = form_condition if filter_expr is None else filter_expr & form_condition
-
-            if ciks:
-                # Create OR condition for multiple CIKs
-                cik_condition = None
-                for c in ciks:
-                    cond = Attr('cik').eq(c)
-                    cik_condition = cond if cik_condition is None else cik_condition | cond
-                if cik_condition:
-                    filter_expr = cik_condition if filter_expr is None else filter_expr & cik_condition
-
-            if filter_expr:
-                scan_kwargs['FilterExpression'] = filter_expr
-
-            response = self.filings_table.scan(**scan_kwargs)
+            response = _self.filings_table.scan(**scan_kwargs)
             items = response.get('Items', [])
 
             # Handle pagination
             while 'LastEvaluatedKey' in response:
                 scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
-                response = self.filings_table.scan(**scan_kwargs)
+                response = _self.filings_table.scan(**scan_kwargs)
                 items.extend(response.get('Items', []))
 
-            # Convert to DataFrame
-            df = pd.DataFrame(items)
-
-            # Convert Decimal to float
-            for col in df.select_dtypes(include=['object']).columns:
-                df[col] = df[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
-
-            return df
-
+            return pd.DataFrame(items)
         except Exception as e:
-            logger.error(f"Error loading filings: {e}")
-            return self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
+            st.error(f"Error fetching recent filings: {str(e)}")
+            return pd.DataFrame()
 
-    def _get_mock_filings(self, start_date=None, end_date=None, asset_class=None, form_types=None, ciks=None) -> pd.DataFrame:
-        """Generate mock filing data for testing"""
-        import numpy as np
-        from datetime import datetime, timedelta
-
-        # Generate dates
-        base_date = datetime.now() - timedelta(days=365)
-        dates = [base_date + timedelta(days=x) for x in range(0, 365, 7)]
-
-        # Asset classes and companies
-        asset_classes = ['AUTO_LOAN', 'CREDIT_CARD', 'STUDENT_LOAN', 'MORTGAGE']
-        companies = [
-            ('0001467858', 'GM Financial'),
-            ('0000038009', 'Ford Credit'),
-            ('0001548357', 'Santander Consumer'),
-            ('0001049169', 'Toyota Financial Services'),
-            ('0001234571', 'Ally Auto Receivables'),
-            ('0001725425', 'Nissan Finance'),
-        ]
-        form_types = ['ABS-EE', '10-D', '10-K', '8-K']
-
-        # Generate mock data
-        data = []
-        for date in dates:
-            for company_cik, company_name in companies:
-                # Determine asset class based on company
-                if any(x in company_name for x in ['GM Financial', 'Ford Credit', 'Santander Consumer',
-                                                     'Toyota Financial', 'Ally', 'Nissan Finance', 'Auto']):
-                    co_asset_class = 'AUTO_LOAN'
-                elif 'Card' in company_name or 'Discover' in company_name:
-                    co_asset_class = 'CREDIT_CARD'
-                elif 'Student' in company_name:
-                    co_asset_class = 'STUDENT_LOAN'
-                else:
-                    co_asset_class = 'MORTGAGE'
-
-                filing = {
-                    'filing_id': f"{company_cik}{date.strftime('%Y%m%d')}",
-                    'accession_number': f"0001234567-{date.strftime('%y-%m%d')}",
-                    'cik': company_cik,
-                    'company_name': company_name,
-                    'issuer_name': company_name,
-                    'form_type': np.random.choice(form_types),
-                    'filing_date': date.strftime('%Y-%m-%d'),
-                    'filing_year': date.year,
-                    'filing_quarter': (date.month - 1) // 3 + 1,
-                    'asset_class': co_asset_class,
-                    'deal_name': f"{company_name} Series {date.strftime('%Y-%m')}",
-
-                    # Financial metrics
-                    'original_pool_balance': np.random.uniform(500000000, 2000000000),
-                    'current_pool_balance': np.random.uniform(300000000, 1500000000),
-                    'total_principal_received': np.random.uniform(100000000, 500000000),
-
-                    # Performance metrics
-                    'delinquency_30_days': np.random.uniform(0.01, 0.05),
-                    'delinquency_60_days': np.random.uniform(0.005, 0.03),
-                    'delinquency_90_plus_days': np.random.uniform(0.002, 0.02),
-                    'cumulative_default_rate': np.random.uniform(0.01, 0.08),
-                    'cumulative_loss_rate': np.random.uniform(0.005, 0.04),
-
-                    # Credit metrics
-                    'weighted_average_fico': int(np.random.uniform(650, 750)),
-                    'weighted_average_ltv': np.random.uniform(0.6, 0.9),
-                    'weighted_average_dti': np.random.uniform(0.3, 0.5),
-
-                    'data_quality_score': np.random.uniform(0.7, 1.0),
-                    'processed_at': date.isoformat(),
-                }
-                data.append(filing)
-
-        df = pd.DataFrame(data)
-
-        # Apply filters
-        if start_date:
-            df = df[df['filing_date'] >= start_date]
-        if end_date:
-            df = df[df['filing_date'] <= end_date]
-        if asset_class and asset_class != "All":
-            df = df[df['asset_class'] == asset_class]
-        if form_types:
-            df = df[df['form_type'].isin(form_types)]
-        if ciks:
-            df = df[df['cik'].isin(ciks)]
-
-        return df
-
-    @st.cache_data(ttl=300)
-    def get_risk_scores(self, cik: Optional[str] = None, asset_class: Optional[str] = None) -> pd.DataFrame:
+    @st.cache_data(ttl=600)
+    def get_risk_scores(_self,
+                       filing_ids: Optional[List[str]] = None) -> pd.DataFrame:
         """
-        Load risk scores with filters
+        Get risk scores for specified filings.
 
         Args:
-            cik: Filter by CIK
-            asset_class: Filter by asset class
+            filing_ids: Optional list of filing IDs to fetch scores for
 
         Returns:
-            DataFrame with risk scores
+            DataFrame with risk score data
         """
-        if self.use_mock_data:
-            return self._get_mock_risk_scores(cik, asset_class)
+        try:
+            if filing_ids:
+                # Batch get items for specific filing IDs
+                items = []
+                # DynamoDB batch_get_item has a limit of 100 items
+                for i in range(0, len(filing_ids), 100):
+                    batch = filing_ids[i:i+100]
+                    response = _self.dynamodb.batch_get_item(
+                        RequestItems={
+                            'abs-risk-scores': {
+                                'Keys': [{'filing_id': fid} for fid in batch]
+                            }
+                        }
+                    )
+                    items.extend(response.get('Responses', {}).get('abs-risk-scores', []))
+            else:
+                # Scan entire table
+                response = _self.risk_scores_table.scan()
+                items = response.get('Items', [])
 
+                while 'LastEvaluatedKey' in response:
+                    response = _self.risk_scores_table.scan(
+                        ExclusiveStartKey=response['LastEvaluatedKey']
+                    )
+                    items.extend(response.get('Items', []))
+
+            return pd.DataFrame(items)
+        except Exception as e:
+            st.error(f"Error fetching risk scores: {str(e)}")
+            return pd.DataFrame()
+
+    @st.cache_data(ttl=3600)
+    def get_pool_statistics(_self,
+                           asset_class: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get aggregated pool statistics across filings.
+
+        Args:
+            asset_class: Optional asset class filter
+
+        Returns:
+            DataFrame with pool statistics
+        """
         try:
             scan_kwargs = {}
 
-            if cik or asset_class:
-                from boto3.dynamodb.conditions import Attr
-                filter_expr = None
+            if asset_class:
+                scan_kwargs['FilterExpression'] = 'asset_class = :ac'
+                scan_kwargs['ExpressionAttributeValues'] = {':ac': asset_class}
 
-                if cik:
-                    filter_expr = Attr('cik').eq(cik)
-                if asset_class and asset_class != "All":
-                    condition = Attr('asset_class').eq(asset_class)
-                    filter_expr = condition if filter_expr is None else filter_expr & condition
-
-                if filter_expr:
-                    scan_kwargs['FilterExpression'] = filter_expr
-
-            response = self.risk_table.scan(**scan_kwargs)
+            response = _self.filings_table.scan(**scan_kwargs)
             items = response.get('Items', [])
 
-            df = pd.DataFrame(items)
+            while 'LastEvaluatedKey' in response:
+                scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+                response = _self.filings_table.scan(**scan_kwargs)
+                items.extend(response.get('Items', []))
 
-            # Convert Decimal to float
-            for col in df.select_dtypes(include=['object']).columns:
-                df[col] = df[col].apply(lambda x: float(x) if isinstance(x, Decimal) else x)
+            # Extract pool statistics
+            pool_data = []
+            for item in items:
+                if 'pool_balance' in item:
+                    pool_data.append({
+                        'filing_id': item.get('filing_id'),
+                        'issuer_name': item.get('issuer_name'),
+                        'asset_class': item.get('asset_class'),
+                        'pool_balance': float(item.get('pool_balance', 0)),
+                        'weighted_avg_coupon': float(item.get('weighted_avg_coupon', 0)),
+                        'weighted_avg_maturity': float(item.get('weighted_avg_maturity', 0)),
+                        'delinquency_rate': float(item.get('delinquency_rate', 0)),
+                        'filing_date': item.get('filing_date')
+                    })
 
-            return df
-
+            return pd.DataFrame(pool_data)
         except Exception as e:
-            logger.error(f"Error loading risk scores: {e}")
-            return self._get_mock_risk_scores(cik, asset_class)
-
-    def _get_mock_risk_scores(self, cik=None, asset_class=None) -> pd.DataFrame:
-        """Generate mock risk score data"""
-        import numpy as np
-
-        # Get filings to generate risk scores
-        filings_df = self._get_mock_filings(cik=cik, asset_class=asset_class)
-
-        if filings_df.empty:
+            st.error(f"Error fetching pool statistics: {str(e)}")
             return pd.DataFrame()
 
-        # Generate risk scores for each filing
-        risk_data = []
-        for _, filing in filings_df.iterrows():
-            risk_score = np.random.uniform(0, 100)
-
-            if risk_score < 30:
-                risk_level = 'LOW'
-            elif risk_score < 60:
-                risk_level = 'MEDIUM'
-            elif risk_score < 80:
-                risk_level = 'HIGH'
-            else:
-                risk_level = 'CRITICAL'
-
-            risk_data.append({
-                'filing_id': filing['filing_id'],
-                'cik': filing['cik'],
-                'company_name': filing['company_name'],
-                'asset_class': filing['asset_class'],
-                'risk_score': risk_score,
-                'risk_level': risk_level,
-                'delinquency_risk': np.random.uniform(0, 100),
-                'default_risk': np.random.uniform(0, 100),
-                'liquidity_risk': np.random.uniform(0, 100),
-                'scored_at': filing['filing_date']
-            })
-
-        return pd.DataFrame(risk_data)
-
-    @st.cache_data(ttl=600)
-    def get_unique_companies(self) -> List[Dict[str, str]]:
-        """Get list of unique companies (CIK and name)"""
-        df = self.get_filings()
-        if df.empty:
-            return []
-
-        companies = df[['cik', 'company_name']].drop_duplicates()
-        return companies.to_dict('records')
-
-    @st.cache_data(ttl=600)
-    def get_asset_classes(self) -> List[str]:
-        """Get list of unique asset classes"""
-        df = self.get_filings()
-        if df.empty:
-            return []
-
-        return sorted(df['asset_class'].unique().tolist())
-
-    @st.cache_data(ttl=600)
-    def get_form_types(self) -> List[str]:
-        """Get list of unique form types"""
-        df = self.get_filings()
-        if df.empty:
-            return []
-
-        return sorted(df['form_type'].unique().tolist())
+    def clear_cache(_self):
+        """Clear all cached data."""
+        st.cache_data.clear()
