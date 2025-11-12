@@ -1,0 +1,567 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ABSolution - Main Infrastructure Stack for ABS Analytics Platform'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+  AlertEmail:
+    Type: String
+    Description: Email address for alerts
+    Default: alerts@example.com
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment Configuration
+        Parameters:
+          - Environment
+          - AlertEmail
+
+Resources:
+  # ========================================
+  # S3 Buckets
+  # ========================================
+  RawDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'abs-solution-raw-data-${Environment}-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ArchiveOldData
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-solution-raw-data-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+
+  ProcessedDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'abs-solution-processed-data-${Environment}-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-solution-processed-data-${Environment}'
+
+  ModelArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'abs-solution-model-artifacts-${Environment}-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ========================================
+  # DynamoDB Tables
+  # ========================================
+  FilingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'abs-filings-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: filing_id
+          AttributeType: S
+        - AttributeName: cik
+          AttributeType: S
+        - AttributeName: filing_date
+          AttributeType: S
+        - AttributeName: asset_class
+          AttributeType: S
+      KeySchema:
+        - AttributeName: filing_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: cik-filing_date-index
+          KeySchema:
+            - AttributeName: cik
+              KeyType: HASH
+            - AttributeName: filing_date
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: asset_class-filing_date-index
+          KeySchema:
+            - AttributeName: asset_class
+              KeyType: HASH
+            - AttributeName: filing_date
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-filings-${Environment}'
+
+  RiskScoresTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'abs-risk-scores-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: filing_id
+          AttributeType: S
+        - AttributeName: scored_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: filing_id
+          KeyType: HASH
+        - AttributeName: scored_at
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-risk-scores-${Environment}'
+
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'abs-alerts-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: alert_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: alert_id
+          KeyType: HASH
+        - AttributeName: created_at
+          KeyType: RANGE
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-alerts-${Environment}'
+
+  # ========================================
+  # Kinesis Stream
+  # ========================================
+  SECFilingsStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: !Sub 'sec-filings-stream-${Environment}'
+      ShardCount: 2
+      RetentionPeriodHours: 24
+      StreamEncryption:
+        EncryptionType: KMS
+        KeyId: alias/aws/kinesis
+      Tags:
+        - Key: Name
+          Value: !Sub 'sec-filings-stream-${Environment}'
+
+  # ========================================
+  # SNS Topic for Alerts
+  # ========================================
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'abs-risk-alerts-${Environment}'
+      DisplayName: ABS Risk Alerts
+      Subscription:
+        - Endpoint: !Ref AlertEmail
+          Protocol: email
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-risk-alerts-${Environment}'
+
+  # ========================================
+  # IAM Roles
+  # ========================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'abs-lambda-execution-role-${Environment}'
+      AssumedBy: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Policies:
+        - PolicyName: ABSLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt RawDataBucket.Arn
+                  - !Sub '${RawDataBucket.Arn}/*'
+                  - !GetAtt ProcessedDataBucket.Arn
+                  - !Sub '${ProcessedDataBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !GetAtt FilingsTable.Arn
+                  - !Sub '${FilingsTable.Arn}/index/*'
+                  - !GetAtt RiskScoresTable.Arn
+                  - !GetAtt AlertsTable.Arn
+              - Effect: Allow
+                Action:
+                  - kinesis:GetRecords
+                  - kinesis:GetShardIterator
+                  - kinesis:DescribeStream
+                  - kinesis:ListStreams
+                  - kinesis:PutRecord
+                  - kinesis:PutRecords
+                Resource: !GetAtt SECFilingsStream.Arn
+              - Effect: Allow
+                Action:
+                  - sagemaker:InvokeEndpoint
+                Resource: !Sub 'arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:endpoint/*'
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref AlertTopic
+              - Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default'
+              - Effect: Allow
+                Action:
+                  - textract:StartDocumentAnalysis
+                  - textract:GetDocumentAnalysis
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - comprehend:DetectSentiment
+                  - comprehend:DetectKeyPhrases
+                  - comprehend:DetectEntities
+                Resource: '*'
+
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'abs-glue-service-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: ABSGluePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt RawDataBucket.Arn
+                  - !Sub '${RawDataBucket.Arn}/*'
+                  - !GetAtt ProcessedDataBucket.Arn
+                  - !Sub '${ProcessedDataBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - textract:StartDocumentAnalysis
+                  - textract:GetDocumentAnalysis
+                  - comprehend:*
+                Resource: '*'
+
+  SageMakerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'abs-sagemaker-execution-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+      Policies:
+        - PolicyName: ABSSageMakerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt ProcessedDataBucket.Arn
+                  - !Sub '${ProcessedDataBucket.Arn}/*'
+                  - !GetAtt ModelArtifactsBucket.Arn
+                  - !Sub '${ModelArtifactsBucket.Arn}/*'
+
+  # ========================================
+  # Glue Database and Crawler
+  # ========================================
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub 'abs_analytics_db_${Environment}'
+        Description: ABS Analytics Database
+
+  # ========================================
+  # EventBridge Rule for Risk Alerts
+  # ========================================
+  RiskAlertRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'abs-risk-threshold-alert-${Environment}'
+      Description: Trigger alerts when risk thresholds are breached
+      EventPattern:
+        source:
+          - abs.risk.scorer
+        detail-type:
+          - High Risk Alert
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt AlertHandlerFunction.Arn
+          Id: AlertHandlerTarget
+
+  # ========================================
+  # Lambda Functions (Placeholders)
+  # ========================================
+  FilingNormalizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'abs-filing-normalizer-${Environment}'
+      Runtime: python3.11
+      Handler: filing_normalizer.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 1024
+      Environment:
+        Variables:
+          PROCESSED_BUCKET: !Ref ProcessedDataBucket
+          DYNAMODB_TABLE: !Ref FilingsTable
+          SNS_TOPIC_ARN: !Ref AlertTopic
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder'}
+      Tags:
+        - Key: Name
+          Value: !Sub 'abs-filing-normalizer-${Environment}'
+
+  RiskScorerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'abs-risk-scorer-${Environment}'
+      Runtime: python3.11
+      Handler: risk_scorer.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 1024
+      Environment:
+        Variables:
+          SAGEMAKER_ENDPOINT: !Sub 'abs-risk-scoring-endpoint-${Environment}'
+          RISK_TABLE: !Ref RiskScoresTable
+          HIGH_RISK_THRESHOLD: '0.75'
+          SNS_TOPIC_ARN: !Ref AlertTopic
+          EVENTBRIDGE_BUS: default
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder'}
+
+  AlertHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'abs-alert-handler-${Environment}'
+      Runtime: python3.11
+      Handler: alert_handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref AlertTopic
+          ALERT_TABLE: !Ref AlertsTable
+          ALERT_EMAIL: !Ref AlertEmail
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder'}
+
+  BenchmarkAPIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'abs-benchmark-api-${Environment}'
+      Runtime: python3.11
+      Handler: benchmark_api.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          FILINGS_TABLE: !Ref FilingsTable
+          RISK_TABLE: !Ref RiskScoresTable
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder'}
+
+  # ========================================
+  # API Gateway
+  # ========================================
+  BenchmarkAPI:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub 'abs-benchmark-api-${Environment}'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - '*'
+
+  BenchmarkAPIIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref BenchmarkAPI
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt BenchmarkAPIFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  BenchmarkAPIRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref BenchmarkAPI
+      RouteKey: 'ANY /{proxy+}'
+      Target: !Sub 'integrations/${BenchmarkAPIIntegration}'
+
+  BenchmarkAPIStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref BenchmarkAPI
+      StageName: !Ref Environment
+      AutoDeploy: true
+
+  BenchmarkAPIPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BenchmarkAPIFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BenchmarkAPI}/*'
+
+  AlertHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AlertHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt RiskAlertRule.Arn
+
+  # ========================================
+  # CloudWatch Log Groups
+  # ========================================
+  FilingNormalizerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/abs-filing-normalizer-${Environment}'
+      RetentionInDays: 30
+
+  RiskScorerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/abs-risk-scorer-${Environment}'
+      RetentionInDays: 30
+
+Outputs:
+  RawDataBucketName:
+    Description: S3 bucket for raw SEC filings
+    Value: !Ref RawDataBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-RawDataBucket'
+
+  ProcessedDataBucketName:
+    Description: S3 bucket for processed data
+    Value: !Ref ProcessedDataBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ProcessedDataBucket'
+
+  KinesisStreamName:
+    Description: Kinesis stream for SEC filings
+    Value: !Ref SECFilingsStream
+    Export:
+      Name: !Sub '${AWS::StackName}-KinesisStream'
+
+  APIEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${BenchmarkAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-APIEndpoint'
+
+  FilingsTableName:
+    Description: DynamoDB table for filings
+    Value: !Ref FilingsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-FilingsTable'
+
+  RiskScoresTableName:
+    Description: DynamoDB table for risk scores
+    Value: !Ref RiskScoresTable
+    Export:
+      Name: !Sub '${AWS::StackName}-RiskScoresTable'
