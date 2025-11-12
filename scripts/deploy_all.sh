@@ -32,7 +32,11 @@ if [ ! -f .env ]; then
 fi
 
 # Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
+set -a
+
+source <(grep -v '^[[:space:]]*#' .env | grep -v '^[[:space:]]*$' | sed 's/[[:space:]]*#.*$//')
+
+set +a
 
 # Default values
 ENVIRONMENT=${ENVIRONMENT:-dev}
