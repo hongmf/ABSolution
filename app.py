@@ -28,17 +28,45 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        color: #1f77b4;
+        font-size: 4.5rem;
+        font-weight: 900;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        letter-spacing: -2px;
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+    .subtitle {
+        text-align: center;
+        font-size: 1.2rem;
+        color: #555;
+        margin-bottom: 2rem;
+        font-weight: 500;
     }
     .metric-card {
         background-color: #f0f2f6;
         padding: 1rem;
         border-radius: 0.5rem;
         margin: 0.5rem 0;
+    }
+    /* Add sparkle effect */
+    @keyframes sparkle {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    .main-header::before {
+        content: '✨';
+        margin-right: 10px;
+        animation: sparkle 2s infinite;
+    }
+    .main-header::after {
+        content: '✨';
+        margin-left: 10px;
+        animation: sparkle 2s infinite;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -67,8 +95,8 @@ def main():
         st.session_state.data_loader = ABSDataLoader(use_mock_data=True)
 
     # Header
-    st.markdown('<h1 class="main-header">ABSolution Analytics Platform</h1>', unsafe_allow_html=True)
-    st.markdown("**AWS-Native ABS Analytics** | Real-time insights into Asset-Backed Securities")
+    st.markdown('<h1 class="main-header">ABSolution</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">AWS-Native ABS Analytics Platform | Real-time insights into Asset-Backed Securities</p>', unsafe_allow_html=True)
 
     # Sidebar
     with st.sidebar:
@@ -98,8 +126,13 @@ def main():
         selected_asset_class = st.selectbox("Asset Class", asset_classes)
 
         # Issuer filter
-        issuers = ['All'] + sorted(data['filings']['issuer_name'].unique().tolist())
-        selected_issuer = st.selectbox("Issuer", issuers)
+        issuers = sorted(data['filings']['issuer_name'].unique().tolist())
+        selected_issuers = st.multiselect(
+            "Issuers",
+            issuers,
+            default=issuers,
+            help="Select one or more issuers to analyze"
+        )
 
         # Date range filter
         min_date = data['filings']['filing_date'].min().date()
@@ -118,8 +151,8 @@ def main():
     if selected_asset_class != 'All':
         filtered_filings = filtered_filings[filtered_filings['asset_class'] == selected_asset_class]
 
-    if selected_issuer != 'All':
-        filtered_filings = filtered_filings[filtered_filings['issuer_name'] == selected_issuer]
+    if selected_issuers:
+        filtered_filings = filtered_filings[filtered_filings['issuer_name'].isin(selected_issuers)]
 
     if len(date_range) == 2:
         start_date, end_date = date_range
