@@ -1,0 +1,30 @@
+{
+  "name": "absolution",
+  "version": "1.0.0",
+  "description": "AWS-native ABS Analytics Platform for SEC Filings Analysis",
+  "scripts": {
+    "deploy:stack": "aws cloudformation create-stack --stack-name absolution-platform-dev --template-body file://infrastructure/cloudformation/main-stack.yaml --parameters ParameterKey=Environment,ParameterValue=dev --capabilities CAPABILITY_NAMED_IAM",
+    "update:stack": "aws cloudformation update-stack --stack-name absolution-platform-dev --template-body file://infrastructure/cloudformation/main-stack.yaml --parameters ParameterKey=Environment,ParameterValue=dev --capabilities CAPABILITY_NAMED_IAM",
+    "delete:stack": "aws cloudformation delete-stack --stack-name absolution-platform-dev",
+    "deploy:lambda": "bash scripts/deploy_lambda.sh",
+    "deploy:glue": "bash scripts/deploy_glue.sh",
+    "deploy:sagemaker": "bash scripts/deploy_sagemaker.sh",
+    "test:local": "pytest tests/ -v",
+    "lint": "pylint src/",
+    "format": "black src/"
+  },
+  "keywords": [
+    "aws",
+    "abs",
+    "asset-backed-securities",
+    "sec-filings",
+    "analytics",
+    "machine-learning"
+  ],
+  "author": "ABSolution Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ABSolution.git"
+  }
+}

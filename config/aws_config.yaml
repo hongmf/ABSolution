@@ -1,0 +1,78 @@
+# AWS ABSolution Configuration
+
+aws:
+  region: us-east-1
+  account_id: ${AWS_ACCOUNT_ID}
+
+# S3 Configuration
+s3:
+  raw_data_bucket: abs-solution-raw-data
+  processed_data_bucket: abs-solution-processed-data
+  model_artifacts_bucket: abs-solution-model-artifacts
+  prefix:
+    sec_filings: sec-filings/
+    normalized_data: normalized/
+    models: models/
+
+# AWS Glue Configuration
+glue:
+  database_name: abs_analytics_db
+  crawler_name: sec_filings_crawler
+  etl_job_name: sec_filings_etl
+  databrew_project: abs_data_prep
+
+# Amazon Kinesis Configuration
+kinesis:
+  stream_name: sec-filings-stream
+  shard_count: 2
+  retention_hours: 24
+
+# Lambda Configuration
+lambda:
+  normalization_function: abs-filing-normalizer
+  scoring_function: abs-risk-scorer
+  alert_function: abs-alert-handler
+  memory_size: 1024
+  timeout: 300
+
+# SageMaker Configuration
+sagemaker:
+  training_instance_type: ml.m5.xlarge
+  inference_instance_type: ml.t2.medium
+  model_name: abs-risk-predictor
+  endpoint_name: abs-risk-scoring-endpoint
+
+# Amazon Neptune Configuration
+neptune:
+  cluster_name: abs-graph-cluster
+  instance_class: db.t3.medium
+
+# EventBridge Configuration
+eventbridge:
+  rule_name: abs-risk-threshold-alert
+  risk_threshold: 0.75
+
+# Bedrock Configuration
+bedrock:
+  model_id: anthropic.claude-3-sonnet-20240229-v1:0
+  max_tokens: 2000
+
+# QuickSight Configuration
+quicksight:
+  dataset_name: abs_analytics_dataset
+  dashboard_name: ABS_Performance_Dashboard
+
+# API Gateway Configuration
+api_gateway:
+  api_name: abs-benchmark-api
+  stage: prod
+
+# Lake Formation Configuration
+lake_formation:
+  database_name: abs_secure_db
+
+# Monitoring and Alerts
+monitoring:
+  enable_cloudwatch: true
+  log_retention_days: 30
+  alarm_email: alerts@example.com
