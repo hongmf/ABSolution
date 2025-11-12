@@ -76,8 +76,9 @@ class SECFilingsProducer:
                 logger.info(f"Fetched {form_type} filings")
 
                 # Simulate filing data for demonstration
-                sample_filing = self._generate_sample_filing(form_type)
-                filings.append(sample_filing)
+                # DISABLED: Do not generate mock filings
+                # sample_filing = self._generate_sample_filing(form_type)
+                # filings.append(sample_filing)
 
                 # Rate limiting
                 time.sleep(0.1)
@@ -321,12 +322,14 @@ def main():
         logger.info(f"Producing {args.count} sample filings...")
 
         # Generate sample filings
-        filings = [producer._generate_sample_filing('ABS-EE')
-                  for _ in range(args.count)]
+        # DISABLED: Do not generate mock filings
+        # filings = [producer._generate_sample_filing('ABS-EE')
+        #           for _ in range(args.count)]
 
-        # Send to Kinesis
-        result = producer.put_records_batch(filings)
-        logger.info(f"Produced {result['success_count']} filings")
+        # Skip sending mock filings to Kinesis
+        logger.warning("Mock filing generation is disabled")
+        # result = producer.put_records_batch(filings)
+        # logger.info(f"Produced {result['success_count']} filings")
 
     elif args.mode == 'continuous':
         producer = SECFilingsProducer(args.stream)
