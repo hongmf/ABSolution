@@ -102,7 +102,7 @@ class ABSDataLoader:
         np.random.seed(42)
         n_records = 100
 
-        issuers = ['Ford Credit', 'American Express', 'Capital One', 'Synchrony', 'GM Financial']
+        issuers = ['Ford Credit', 'GM Financial', 'Santander Consumer', 'Nissan Finance', 'Toyota Financial Service']
         asset_classes = ['Auto Loan', 'Credit Card', 'Student Loan', 'Equipment Lease']
         form_types = ['ABS-EE', '10-D', '10-K', '8-K']
 
@@ -134,14 +134,14 @@ class ABSDataLoader:
         issuers = [
             {'issuer_id': 1, 'issuer_name': 'Ford Credit', 'cik': '38009',
              'primary_asset_class': 'Auto Loan', 'total_deals': 15},
-            {'issuer_id': 2, 'issuer_name': 'American Express', 'cik': '4962',
-             'primary_asset_class': 'Credit Card', 'total_deals': 22},
-            {'issuer_id': 3, 'issuer_name': 'Capital One', 'cik': '927628',
-             'primary_asset_class': 'Credit Card', 'total_deals': 18},
-            {'issuer_id': 4, 'issuer_name': 'Synchrony', 'cik': '1601712',
-             'primary_asset_class': 'Credit Card', 'total_deals': 12},
-            {'issuer_id': 5, 'issuer_name': 'GM Financial', 'cik': '1529377',
-             'primary_asset_class': 'Auto Loan', 'total_deals': 10}
+            {'issuer_id': 2, 'issuer_name': 'GM Financial', 'cik': '1529377',
+             'primary_asset_class': 'Auto Loan', 'total_deals': 18},
+            {'issuer_id': 3, 'issuer_name': 'Santander Consumer', 'cik': '1174780',
+             'primary_asset_class': 'Auto Loan', 'total_deals': 12},
+            {'issuer_id': 4, 'issuer_name': 'Nissan Finance', 'cik': '1467858',
+             'primary_asset_class': 'Auto Loan', 'total_deals': 14},
+            {'issuer_id': 5, 'issuer_name': 'Toyota Financial Service', 'cik': '1049502',
+             'primary_asset_class': 'Auto Loan', 'total_deals': 20}
         ]
 
         return pd.DataFrame(issuers)
