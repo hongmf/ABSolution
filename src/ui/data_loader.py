@@ -68,7 +68,7 @@ class ABSDataLoader:
             DataFrame with filing data
         """
         if _self.use_mock_data:
-            return _self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
+            return self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
 
         try:
             # Query DynamoDB
@@ -130,7 +130,7 @@ class ABSDataLoader:
 
         except Exception as e:
             logger.error(f"Error loading filings: {e}")
-            return _self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
+            return self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
 
     def _get_mock_filings(_self, start_date=None, end_date=None, asset_class=None, form_types=None, ciks=None) -> pd.DataFrame:
         """Generate mock filing data for testing"""
@@ -270,7 +270,7 @@ class ABSDataLoader:
         import numpy as np
 
         # Get filings to generate risk scores
-        filings_df = _self._get_mock_filings(cik=cik, asset_class=asset_class)
+        filings_df = self._get_mock_filings(cik=cik, asset_class=asset_class)
 
         if filings_df.empty:
             return pd.DataFrame()
