@@ -9,5 +9,5 @@
   "processed_bucket": "abs-solution-processed-data-dev-060266714128",
   "kinesis_stream": "sec-filings-stream-dev",
   "filings_table": "abs-filings-dev",
-  "duration_seconds": 33
+  "duration_seconds": 33 
 }
