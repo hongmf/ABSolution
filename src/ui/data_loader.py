@@ -48,7 +48,7 @@ class ABSDataLoader:
                 self.use_mock_data = True
 
     @st.cache_data(ttl=300)  # Cache for 5 minutes
-    def get_filings(_self,
+    def get_filings(self,
                    start_date: Optional[str] = None,
                    end_date: Optional[str] = None,
                    asset_class: Optional[str] = None,
@@ -67,7 +67,7 @@ class ABSDataLoader:
         Returns:
             DataFrame with filing data
         """
-        if _self.use_mock_data:
+        if self.use_mock_data:
             return self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
 
         try:
@@ -110,13 +110,13 @@ class ABSDataLoader:
             if filter_expr:
                 scan_kwargs['FilterExpression'] = filter_expr
 
-            response = _self.filings_table.scan(**scan_kwargs)
+            response = self.filings_table.scan(**scan_kwargs)
             items = response.get('Items', [])
 
             # Handle pagination
             while 'LastEvaluatedKey' in response:
                 scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
-                response = _self.filings_table.scan(**scan_kwargs)
+                response = self.filings_table.scan(**scan_kwargs)
                 items.extend(response.get('Items', []))
 
             # Convert to DataFrame
@@ -132,7 +132,7 @@ class ABSDataLoader:
             logger.error(f"Error loading filings: {e}")
             return self._get_mock_filings(start_date, end_date, asset_class, form_types, ciks)
 
-    def _get_mock_filings(_self, start_date=None, end_date=None, asset_class=None, form_types=None, ciks=None) -> pd.DataFrame:
+    def _get_mock_filings(self, start_date=None, end_date=None, asset_class=None, form_types=None, ciks=None) -> pd.DataFrame:
         """Generate mock filing data for testing"""
         import numpy as np
         from datetime import datetime, timedelta
@@ -220,7 +220,7 @@ class ABSDataLoader:
         return df
 
     @st.cache_data(ttl=300)
-    def get_risk_scores(_self, cik: Optional[str] = None, asset_class: Optional[str] = None) -> pd.DataFrame:
+    def get_risk_scores(self, cik: Optional[str] = None, asset_class: Optional[str] = None) -> pd.DataFrame:
         """
         Load risk scores with filters
 
@@ -231,8 +231,8 @@ class ABSDataLoader:
         Returns:
             DataFrame with risk scores
         """
-        if _self.use_mock_data:
-            return _self._get_mock_risk_scores(cik, asset_class)
+        if self.use_mock_data:
+            return self._get_mock_risk_scores(cik, asset_class)
 
         try:
             scan_kwargs = {}
@@ -250,7 +250,7 @@ class ABSDataLoader:
                 if filter_expr:
                     scan_kwargs['FilterExpression'] = filter_expr
 
-            response = _self.risk_table.scan(**scan_kwargs)
+            response = self.risk_table.scan(**scan_kwargs)
             items = response.get('Items', [])
 
             df = pd.DataFrame(items)
@@ -263,9 +263,9 @@ class ABSDataLoader:
 
         except Exception as e:
             logger.error(f"Error loading risk scores: {e}")
-            return _self._get_mock_risk_scores(cik, asset_class)
+            return self._get_mock_risk_scores(cik, asset_class)
 
-    def _get_mock_risk_scores(_self, cik=None, asset_class=None) -> pd.DataFrame:
+    def _get_mock_risk_scores(self, cik=None, asset_class=None) -> pd.DataFrame:
         """Generate mock risk score data"""
         import numpy as np
 
@@ -305,9 +305,9 @@ class ABSDataLoader:
         return pd.DataFrame(risk_data)
 
     @st.cache_data(ttl=600)
-    def get_unique_companies(_self) -> List[Dict[str, str]]:
+    def get_unique_companies(self) -> List[Dict[str, str]]:
         """Get list of unique companies (CIK and name)"""
-        df = _self.get_filings()
+        df = self.get_filings()
         if df.empty:
             return []
 
@@ -315,18 +315,18 @@ class ABSDataLoader:
         return companies.to_dict('records')
 
     @st.cache_data(ttl=600)
-    def get_asset_classes(_self) -> List[str]:
+    def get_asset_classes(self) -> List[str]:
         """Get list of unique asset classes"""
-        df = _self.get_filings()
+        df = self.get_filings()
         if df.empty:
             return []
 
         return sorted(df['asset_class'].unique().tolist())
 
     @st.cache_data(ttl=600)
-    def get_form_types(_self) -> List[str]:
+    def get_form_types(self) -> List[str]:
         """Get list of unique form types"""
-        df = _self.get_filings()
+        df = self.get_filings()
         if df.empty:
             return []
 
