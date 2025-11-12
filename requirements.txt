@@ -13,7 +13,8 @@ pyarrow>=14.0.0
 
 # SEC API and Data Extraction
 sec-edgar-downloader>=5.0.0
-sec-api>=1.0.0
+sec-downloader
+# sec-api>=1.0.0
 requests>=2.31.0
 
 # PDF Processing (for Textract integration)
