@@ -146,9 +146,9 @@ class ABSDataLoader:
             ('0001467858', 'GM Financial'),
             ('0000038009', 'Ford Credit'),
             ('0001548357', 'Santander Consumer'),
-            ('0001234570', 'Bank of America Mortgage'),
+            ('0001049169', 'Toyota Financial Services'),
             ('0001234571', 'Ally Auto Receivables'),
-            ('0001234572', 'Discover Card Trust'),
+            ('0001725425', 'Nissan Finance'),
         ]
         form_types = ['ABS-EE', '10-D', '10-K', '8-K']
 
@@ -157,7 +157,8 @@ class ABSDataLoader:
         for date in dates:
             for company_cik, company_name in companies:
                 # Determine asset class based on company
-                if any(x in company_name for x in ['GM Financial', 'Ford Credit', 'Santander Consumer', 'Ally', 'Auto']):
+                if any(x in company_name for x in ['GM Financial', 'Ford Credit', 'Santander Consumer',
+                                                     'Toyota Financial', 'Ally', 'Nissan Finance', 'Auto']):
                     co_asset_class = 'AUTO_LOAN'
                 elif 'Card' in company_name or 'Discover' in company_name:
                     co_asset_class = 'CREDIT_CARD'
