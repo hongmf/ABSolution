@@ -22,7 +22,9 @@ print_info() { echo -e "  $1"; }
 
 # Load environment variables
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    set -a
+    source <(grep -v '^[[:space:]]*#' .env | grep -v '^[[:space:]]*$' | sed 's/[[:space:]]*#.*$//')
+    set +a
     print_success "Environment loaded from .env"
 else
     print_error ".env file not found"
