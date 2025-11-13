@@ -1,66 +1,7 @@
-# AWS SDK and Core Dependencies
-boto3>=1.34.0
-botocore>=1.34.0
-awswrangler>=3.6.0
-
-# Data Processing
-pandas>=2.1.0
-numpy>=1.24.0
-pyarrow>=14.0.0
-
-# AWS Glue
-# awsglue>=4.0
-
-# SEC API and Data Extraction
-sec-edgar-downloader>=5.0.0
-sec-downloader
-# sec-api>=1.0.0
-requests>=2.31.0
-
-# PDF Processing (for Textract integration)
-PyPDF2>=3.0.0
-pdfplumber>=0.10.0
-
-# NLP and Sentiment Analysis
-transformers>=4.35.0
-torch>=2.1.0
-
-# Machine Learning
-scikit-learn>=1.3.0
-xgboost>=2.0.0
-lightgbm>=4.1.0
-
-# API Development
-fastapi>=0.104.0
-uvicorn>=0.24.0
-pydantic>=2.5.0
-
-# Testing
-pytest>=7.4.0
-moto>=4.2.0
-pytest-cov>=4.1.0
-
-# Dashboard and Visualization
-streamlit>=1.28.0
-plotly>=5.18.0
-
-# Utilities
-python-dotenv>=1.0.0
-pyyaml>=6.0.1
-jsonschema>=4.20.0
-
-# Streamlit UI
-streamlit>=1.31.0
-plotly>=5.18.0
-altair>=5.2.0
-matplotlib>=3.8.0
-seaborn>=0.13.0
-
-# AWS CDK for Infrastructure
-aws-cdk-lib>=2.110.0
-constructs>=10.3.0
-
-# Multi-Agent System
-anthropic>=0.25.0  # For Bedrock Claude models
-langchain>=0.1.0  # Optional: For advanced agent orchestration
-langchain-aws>=0.1.0
+streamlit
+pandas
+matplotlib
+seaborn
+numpy
+boto3
+python-dotenv
