@@ -1,5 +1,5 @@
 {
-  "deployment_time": "2025-11-12T17:50:03Z",
+  "deployment_time": "2025-11-13T05:37:57Z",
   "environment": "dev",
   "region": "us-east-1",
   "stack_name": "absolution-platform-dev",
@@ -9,5 +9,5 @@
   "processed_bucket": "abs-solution-processed-data-dev-060266714128",
   "kinesis_stream": "sec-filings-stream-dev",
   "filings_table": "abs-filings-dev",
-  "duration_seconds": 34
+  "duration_seconds": 33
 }
