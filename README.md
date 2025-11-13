@@ -19,15 +19,42 @@ ABSolution features a sophisticated multi-agent AI system powered by Amazon Bedr
 # Deploy the multi-agent system
 ./scripts/deploy_agents.sh
 
-# Test the system
-python scripts/test_agents.py https://your-api-endpoint
+# Start the web UI
+python3 scripts/serve_ui.py
+
+# Open browser and navigate to http://localhost:8080
 ```
 
-📖 **See full documentation:** [docs/multi_agent_system.md](docs/multi_agent_system.md)
+📖 **Documentation:**
+- [Multi-Agent System](docs/multi_agent_system.md) - Complete technical documentation
+- [Dialogue Panel Guide](docs/dialogue_panel_guide.md) - User interface guide
+
+## 🌐 Dialogue Panel
+
+Access the multi-agent system through a beautiful web interface:
+
+![Dialogue Panel Features](https://img.shields.io/badge/UI-Modern_Dark_Theme-blue)
+![Real-time](https://img.shields.io/badge/Updates-Real--time-green)
+![Responsive](https://img.shields.io/badge/Design-Responsive-purple)
+
+**Features:**
+- 💬 Natural chat interface
+- 🤖 Real-time agent status indicators
+- 💡 AI-generated follow-up suggestions
+- 📊 Agent attribution for transparency
+- 💾 Export conversations as Markdown
+- ⚡ Quick action buttons
+- 📱 Responsive mobile design
+
+**Try it:**
+```bash
+python3 scripts/serve_ui.py
+# Open http://localhost:8080
+```
 
 ## Architecture Overview
 
-# go beyond basic ETL -> use aws native services
+### go beyond basic ETL -> use aws native services
 - AWS glue + glue databrew
   automate ingestion and transformation of sec filings into a normalized schema
 - amazon textract
