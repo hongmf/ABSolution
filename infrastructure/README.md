@@ -114,6 +114,31 @@ ls cdk.json  # Should exist
 cdk synth    # Should work now
 ```
 
+### Error 9009 - Subprocess Exited
+
+**Cause**: Python executable not found or wrong name (python3 vs python)
+
+**Quick Fix**:
+```bash
+# The cdk.json now uses "python" instead of "python3"
+# If still failing, try:
+
+# Option 1: Run directly
+python app.py
+
+# Option 2: Use provided scripts
+cdk.bat      # Windows
+./cdk.sh     # Linux/Mac
+
+# Option 3: Virtual environment
+python -m venv venv
+venv\Scripts\activate    # Windows
+source venv/bin/activate # Linux/Mac
+pip install -r requirements.txt
+```
+
+**Detailed Guide**: See [docs/CDK_ERROR_9009.md](../docs/CDK_ERROR_9009.md)
+
 ### Bootstrap Error
 
 **Solution**: Bootstrap your AWS account:
