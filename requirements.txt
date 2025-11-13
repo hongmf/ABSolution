@@ -5,3 +5,4 @@ seaborn
 numpy
 boto3
 python-dotenv
+scikit-learn
