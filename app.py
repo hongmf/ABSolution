@@ -186,7 +186,7 @@ def main():
     st.divider()
 
     # Charts
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -364,6 +364,61 @@ def main():
             file_name=f"abs_filings_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
         )
+
+    with tab5:
+        st.subheader("📈 Interactive Plots")
+        
+        if len(filtered_filings) > 0:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Select columns for plotting
+                numeric_cols = filtered_filings.select_dtypes(include=['number']).columns.tolist()
+                categorical_cols = filtered_filings.select_dtypes(include=['object', 'category']).columns.tolist()
+                
+                x_axis = st.selectbox("X-axis", numeric_cols + categorical_cols, key="x_axis")
+                y_axis = st.selectbox("Y-axis", numeric_cols, key="y_axis")
+                
+            with col2:
+                plot_type = st.selectbox("Plot Type", ["Scatter", "Line", "Bar", "Histogram", "Box"], key="plot_type")
+                color_by = st.selectbox("Color by (optional)", ["None"] + categorical_cols, key="color_by")
+            
+            # Generate plot based on selection
+            if st.button("Generate Plot"):
+                try:
+                    color_col = None if color_by == "None" else color_by
+                    
+                    if plot_type == "Scatter":
+                        fig = px.scatter(filtered_filings, x=x_axis, y=y_axis, color=color_col,
+                                       title=f"{y_axis} vs {x_axis}")
+                    elif plot_type == "Line":
+                        fig = px.line(filtered_filings, x=x_axis, y=y_axis, color=color_col,
+                                     title=f"{y_axis} over {x_axis}")
+                    elif plot_type == "Bar":
+                        if x_axis in categorical_cols:
+                            agg_data = filtered_filings.groupby(x_axis)[y_axis].mean().reset_index()
+                            fig = px.bar(agg_data, x=x_axis, y=y_axis,
+                                       title=f"Average {y_axis} by {x_axis}")
+                        else:
+                            fig = px.bar(filtered_filings, x=x_axis, y=y_axis, color=color_col,
+                                       title=f"{y_axis} vs {x_axis}")
+                    elif plot_type == "Histogram":
+                        fig = px.histogram(filtered_filings, x=x_axis, color=color_col,
+                                         title=f"Distribution of {x_axis}")
+                    elif plot_type == "Box":
+                        if color_col:
+                            fig = px.box(filtered_filings, x=color_col, y=y_axis,
+                                       title=f"{y_axis} by {color_col}")
+                        else:
+                            fig = px.box(filtered_filings, y=y_axis,
+                                       title=f"Distribution of {y_axis}")
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                except Exception as e:
+                    st.error(f"Error generating plot: {str(e)}")
+        else:
+            st.info("No data available for plotting. Please adjust your filters.")
 
     # Footer
     st.divider()
