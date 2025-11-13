@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABSolution - AI Dialogue Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="14" stroke="#3B82F6" stroke-width="2"/>
+                    <path d="M12 16L15 19L20 13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h1>ABSolution</h1>
+            </div>
+            <div class="header-info">
+                <span class="badge" id="connection-status">
+                    <span class="status-dot"></span>
+                    Connected
+                </span>
+                <span class="session-id" id="session-id">Session: Loading...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Active Agents</h3>
+                    <div class="agent-list">
+                        <div class="agent-card" data-agent="data_analyst">
+                            <div class="agent-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">📊</div>
+                            <div class="agent-info">
+                                <h4>Data Analyst</h4>
+                                <p>Query & analyze SEC filings</p>
+                            </div>
+                            <div class="agent-status">●</div>
+                        </div>
+
+                        <div class="agent-card" data-agent="risk_assessor">
+                            <div class="agent-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">⚠️</div>
+                            <div class="agent-info">
+                                <h4>Risk Assessor</h4>
+                                <p>Evaluate credit risk</p>
+                            </div>
+                            <div class="agent-status">●</div>
+                        </div>
+
+                        <div class="agent-card" data-agent="report_generator">
+                            <div class="agent-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">📝</div>
+                            <div class="agent-info">
+                                <h4>Report Generator</h4>
+                                <p>Create narrative reports</p>
+                            </div>
+                            <div class="agent-status">●</div>
+                        </div>
+
+                        <div class="agent-card" data-agent="benchmark_analyst">
+                            <div class="agent-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">📈</div>
+                            <div class="agent-info">
+                                <h4>Benchmark Analyst</h4>
+                                <p>Compare performance</p>
+                            </div>
+                            <div class="agent-status">●</div>
+                        </div>
+
+                        <div class="agent-card" data-agent="alert_monitor">
+                            <div class="agent-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">🔔</div>
+                            <div class="agent-info">
+                                <h4>Alert Monitor</h4>
+                                <p>Detect anomalies</p>
+                            </div>
+                            <div class="agent-status">●</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Quick Actions</h3>
+                    <div class="quick-actions">
+                        <button class="action-btn" onclick="sendQuickQuery('Show me recent ABS deals')">
+                            Recent Deals
+                        </button>
+                        <button class="action-btn" onclick="sendQuickQuery('Generate market summary')">
+                            Market Summary
+                        </button>
+                        <button class="action-btn" onclick="sendQuickQuery('Show high-risk securities')">
+                            High Risk Alerts
+                        </button>
+                        <button class="action-btn" onclick="clearChat()">
+                            Clear Chat
+                        </button>
+                        <button class="action-btn" onclick="exportChat()">
+                            Export Chat
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Welcome Message -->
+                    <div class="message system-message">
+                        <div class="message-content">
+                            <h3>👋 Welcome to ABSolution AI Dialogue Panel</h3>
+                            <p>I'm your multi-agent AI assistant for Asset-Backed Securities analysis. I coordinate five specialized agents to help you:</p>
+                            <ul>
+                                <li>📊 Query and analyze SEC filings data</li>
+                                <li>⚠️ Assess credit risk and generate risk scores</li>
+                                <li>📝 Create comprehensive reports</li>
+                                <li>📈 Compare performance against benchmarks</li>
+                                <li>🔔 Monitor alerts and detect anomalies</li>
+                            </ul>
+                            <p><strong>Try asking:</strong></p>
+                            <p class="example-query">"What's the risk score for security ABC-123?"</p>
+                            <p class="example-query">"Show me all auto ABS deals from Q1 2024"</p>
+                            <p class="example-query">"Generate a deal analysis report"</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Typing Indicator -->
+                <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <span class="typing-text">Agents are analyzing...</span>
+                </div>
+
+                <!-- Suggestions -->
+                <div class="suggestions" id="suggestions" style="display: none;">
+                    <span class="suggestions-label">Suggested questions:</span>
+                    <div class="suggestion-chips" id="suggestion-chips">
+                        <!-- Suggestions will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <div class="input-container">
+                        <textarea
+                            id="message-input"
+                            placeholder="Ask me anything about Asset-Backed Securities..."
+                            rows="1"
+                            maxlength="2000"
+                        ></textarea>
+                        <button id="send-button" class="send-button" onclick="sendMessage()">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-footer">
+                        <span class="char-count"><span id="char-count">0</span>/2000</span>
+                        <span class="hint">Press Ctrl+Enter to send</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div class="modal" id="config-modal" style="display: none;">
+        <div class="modal-content">
+            <h2>API Configuration</h2>
+            <div class="form-group">
+                <label for="api-endpoint">API Endpoint:</label>
+                <input type="text" id="api-endpoint" placeholder="https://your-api-endpoint.com/prod">
+            </div>
+            <div class="form-group">
+                <label for="api-key">API Key (optional):</label>
+                <input type="password" id="api-key" placeholder="Enter API key if required">
+            </div>
+            <div class="modal-actions">
+                <button onclick="saveConfig()" class="btn-primary">Save</button>
+                <button onclick="closeConfigModal()" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
