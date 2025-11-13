@@ -1,5 +1,32 @@
 # ABSolution
 
+**AWS-Native Asset-Backed Securities Analytics Platform**
+
+A comprehensive, AI-powered platform for analyzing Asset-Backed Securities (ABS) using AWS services, featuring a multi-agent AI system for intelligent analysis and insights.
+
+## 🤖 Multi-Agent AI System
+
+ABSolution features a sophisticated multi-agent AI system powered by Amazon Bedrock. Five specialized agents work together to provide comprehensive ABS analysis:
+
+- **Data Analyst Agent** - Queries and analyzes SEC filings
+- **Risk Assessor Agent** - Evaluates credit risk with ML models
+- **Report Generator Agent** - Creates narrative reports
+- **Benchmark Analyst Agent** - Performs comparative analysis
+- **Alert Monitor Agent** - Detects anomalies and generates alerts
+
+**Quick Start:**
+```bash
+# Deploy the multi-agent system
+./scripts/deploy_agents.sh
+
+# Test the system
+python scripts/test_agents.py https://your-api-endpoint
+```
+
+📖 **See full documentation:** [docs/multi_agent_system.md](docs/multi_agent_system.md)
+
+## Architecture Overview
+
 # go beyond basic ETL -> use aws native services
 - AWS glue + glue databrew
   automate ingestion and transformation of sec filings into a normalized schema

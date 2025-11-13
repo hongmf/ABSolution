@@ -1,0 +1,249 @@
+{
+  "Comment": "Multi-Agent Orchestration Workflow for ABSolution",
+  "StartAt": "ClassifyIntent",
+  "States": {
+    "ClassifyIntent": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "abs-agent-coordinator",
+        "Payload": {
+          "action": "classify_intent",
+          "query.$": "$.user_query"
+        }
+      },
+      "ResultPath": "$.intent",
+      "Next": "RouteToAgents"
+    },
+    "RouteToAgents": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.intent.primary_agent",
+          "StringEquals": "data_analyst",
+          "Next": "DataAnalystOnly"
+        },
+        {
+          "Variable": "$.intent.primary_agent",
+          "StringEquals": "risk_assessor",
+          "Next": "RiskAssessmentWorkflow"
+        },
+        {
+          "Variable": "$.intent.primary_agent",
+          "StringEquals": "report_generator",
+          "Next": "ReportGenerationWorkflow"
+        },
+        {
+          "Variable": "$.intent.primary_agent",
+          "StringEquals": "benchmark_analyst",
+          "Next": "BenchmarkAnalysisWorkflow"
+        },
+        {
+          "Variable": "$.intent.primary_agent",
+          "StringEquals": "alert_monitor",
+          "Next": "AlertMonitorOnly"
+        }
+      ],
+      "Default": "DataAnalystOnly"
+    },
+    "DataAnalystOnly": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "abs-agent-data_analyst",
+        "Payload": {
+          "task.$": "$.user_query",
+          "context.$": "$.context"
+        }
+      },
+      "ResultPath": "$.result",
+      "End": true
+    },
+    "RiskAssessmentWorkflow": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "FetchData",
+          "States": {
+            "FetchData": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-data_analyst",
+                "Payload": {
+                  "task": "Fetch risk assessment data",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "CalculateRiskScore",
+          "States": {
+            "CalculateRiskScore": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-risk_assessor",
+                "Payload": {
+                  "task.$": "$.user_query",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.parallel_results",
+      "Next": "GenerateRiskReport"
+    },
+    "GenerateRiskReport": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "abs-agent-report_generator",
+        "Payload": {
+          "task": "Generate risk assessment report",
+          "context": {
+            "data.$": "$.parallel_results[0].Payload",
+            "risk_score.$": "$.parallel_results[1].Payload"
+          }
+        }
+      },
+      "ResultPath": "$.result",
+      "End": true
+    },
+    "ReportGenerationWorkflow": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "GatherData",
+          "States": {
+            "GatherData": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-data_analyst",
+                "Payload": {
+                  "task": "Gather report data",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "AssessRisk",
+          "States": {
+            "AssessRisk": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-risk_assessor",
+                "Payload": {
+                  "task": "Assess risk for report",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "BenchmarkAnalysis",
+          "States": {
+            "BenchmarkAnalysis": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-benchmark_analyst",
+                "Payload": {
+                  "task": "Perform benchmark analysis",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.analysis_results",
+      "Next": "CompileReport"
+    },
+    "CompileReport": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "abs-agent-report_generator",
+        "Payload": {
+          "task": "Compile comprehensive report",
+          "context": {
+            "data.$": "$.analysis_results[0].Payload",
+            "risk.$": "$.analysis_results[1].Payload",
+            "benchmark.$": "$.analysis_results[2].Payload"
+          }
+        }
+      },
+      "ResultPath": "$.result",
+      "End": true
+    },
+    "BenchmarkAnalysisWorkflow": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "FetchBenchmarkData",
+          "States": {
+            "FetchBenchmarkData": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-data_analyst",
+                "Payload": {
+                  "task": "Fetch benchmark data",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "PerformComparison",
+          "States": {
+            "PerformComparison": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "abs-agent-benchmark_analyst",
+                "Payload": {
+                  "task.$": "$.user_query",
+                  "context.$": "$.context"
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.result",
+      "End": true
+    },
+    "AlertMonitorOnly": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "abs-agent-alert_monitor",
+        "Payload": {
+          "task.$": "$.user_query",
+          "context.$": "$.context"
+        }
+      },
+      "ResultPath": "$.result",
+      "End": true
+    }
+  }
+}

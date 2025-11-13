@@ -1,0 +1,149 @@
+# Multi-Agent System Configuration
+# ABSolution - AWS AI Agent System
+
+agents:
+  data_analyst:
+    name: "Data Analyst"
+    aws_service: "bedrock"
+    model_id: "anthropic.claude-v2"
+    description: "Query and analyze SEC filings data, extract metrics"
+    capabilities:
+      - query_sec_filings
+      - extract_metrics
+      - analyze_trends
+      - data_validation
+    config:
+      temperature: 0.3
+      max_tokens: 2000
+      top_p: 0.9
+
+  risk_assessor:
+    name: "Risk Assessor"
+    aws_service: "bedrock"
+    model_id: "anthropic.claude-v2"
+    sagemaker_endpoint: "abs-risk-scoring-model"
+    description: "Evaluate credit risk and generate risk scores"
+    capabilities:
+      - calculate_risk_score
+      - assess_collateral_quality
+      - stress_testing
+      - identify_red_flags
+      - compare_to_benchmarks
+    config:
+      temperature: 0.2
+      max_tokens: 2500
+      top_p: 0.85
+    thresholds:
+      low: [0, 30]
+      medium: [31, 60]
+      high: [61, 85]
+      critical: [86, 100]
+
+  report_generator:
+    name: "Report Generator"
+    aws_service: "bedrock"
+    model_id: "anthropic.claude-v2"
+    description: "Generate narrative reports and recommendations"
+    capabilities:
+      - generate_deal_report
+      - create_executive_summary
+      - write_risk_narrative
+      - produce_recommendations
+      - format_for_clients
+    config:
+      temperature: 0.7
+      max_tokens: 4000
+      top_p: 0.9
+    templates:
+      - deal_analysis
+      - risk_summary
+      - market_overview
+
+  benchmark_analyst:
+    name: "Benchmark Analyst"
+    aws_service: "bedrock"
+    model_id: "anthropic.claude-v2"
+    description: "Compare performance and analyze trends"
+    capabilities:
+      - compare_to_benchmark
+      - peer_group_analysis
+      - trend_identification
+      - performance_attribution
+      - market_positioning
+    config:
+      temperature: 0.4
+      max_tokens: 2500
+      top_p: 0.9
+    benchmarks:
+      - ABX.HE
+      - CMBX
+      - custom_indices
+
+  alert_monitor:
+    name: "Alert Monitor"
+    aws_service: "bedrock"
+    model_id: "anthropic.claude-v2"
+    description: "Monitor events and detect anomalies"
+    capabilities:
+      - detect_anomalies
+      - assess_severity
+      - generate_alerts
+      - recommend_actions
+      - identify_patterns
+    config:
+      temperature: 0.1
+      max_tokens: 1500
+      top_p: 0.85
+    alert_types:
+      - performance
+      - rating
+      - filing
+      - market
+    severity_levels:
+      - critical
+      - high
+      - medium
+      - low
+
+orchestration:
+  routing_strategy: "intent_based"
+  execution_modes:
+    - sequential
+    - parallel
+  max_agents_parallel: 3
+  timeout_seconds: 300
+
+infrastructure:
+  aws_region: "us-east-1"
+  dynamodb:
+    conversation_table: "abs-agent-conversations"
+    session_table: "abs-agent-sessions"
+    billing_mode: "PAY_PER_REQUEST"
+
+  lambda:
+    runtime: "python3.11"
+    memory_mb: 1024
+    timeout_seconds: 300
+
+  api_gateway:
+    name: "ABSolution Dialogue API"
+    stage: "prod"
+    cors_enabled: true
+
+  step_functions:
+    workflow_name: "abs-multi-agent-workflow"
+    max_duration_minutes: 15
+
+  eventbridge:
+    daily_summary_cron: "cron(0 8 * * ? *)"
+    alert_monitoring_rate: "rate(15 minutes)"
+
+dialogue_panel:
+  max_history_turns: 50
+  session_ttl_hours: 24
+  suggest_followups: true
+  export_formats:
+    - json
+    - markdown
+    - text
+  visualization_hints: true

@@ -43,3 +43,12 @@ pytest-cov>=4.1.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.1
 jsonschema>=4.20.0
+
+# AWS CDK for Infrastructure
+aws-cdk-lib>=2.110.0
+constructs>=10.3.0
+
+# Multi-Agent System
+anthropic>=0.25.0  # For Bedrock Claude models
+langchain>=0.1.0  # Optional: For advanced agent orchestration
+langchain-aws>=0.1.0
