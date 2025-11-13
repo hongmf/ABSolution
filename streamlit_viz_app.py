@@ -20,6 +20,7 @@ from scripts.bedrock_claude import call_bedrock_claude
 from scripts.safe_convert import safe_numeric_conversion
 from scripts.s3_data_loader import list_s3_folders, list_s3_files, load_s3_file
 from scripts.dynamodb_loader import load_dynamodb_table, list_dynamodb_tables
+from scripts.prediction_agent_ts import predict_time_series
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -225,8 +226,38 @@ if prompt := st.chat_input("Ask for a visualization..."):
                     recommendations = call_bedrock_claude(viz_prompt, data_summary)
                     st.markdown(recommendations)
                     
-                    # Generate multiple plots
-                    st.subheader("📊 Generated Visualizations")
+                    # Check if it's a prediction request
+                    if any(word in prompt.lower() for word in ['predict', 'forecast', 'future', 'trend']):
+                        st.subheader("🔮 Time Series Prediction")
+                        
+                        # Select target variable
+                        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                        if numeric_cols:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                target_col = st.selectbox("Select variable to predict:", numeric_cols)
+                            with col2:
+                                categorical_cols = df.select_dtypes(exclude=[np.number]).columns.tolist()
+                                group_options = ["None"] + categorical_cols
+                                group_col = st.selectbox("Group by (optional):", group_options)
+                                group_col = None if group_col == "None" else group_col
+                            
+                            with st.spinner("Training models and generating predictions..."):
+                                try:
+                                    fig, summary = predict_time_series(df, target_col, group_col)
+                                    if fig:
+                                        st.pyplot(fig)
+                                        st.write(f"**Model Used:** {summary['model_used']}")
+                                        st.write(f"**Groups Predicted:** {summary['groups_predicted']}")
+                                        st.write(f"**Prediction Steps:** {summary['prediction_length']}")
+                                    else:
+                                        st.error("Could not generate predictions")
+                                except Exception as e:
+                                    st.error(f"Prediction error: {str(e)}")
+                    
+                    else:
+                        # Generate multiple plots
+                        st.subheader("📊 Generated Visualizations")
                     
                     # Create 2x2 grid of plots
                     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))

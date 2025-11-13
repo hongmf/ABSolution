@@ -366,57 +366,95 @@ def main():
         )
 
     with tab5:
-        st.subheader("📈 Interactive Plots")
+        st.subheader("📈 Data Visualization")
         
         if len(filtered_filings) > 0:
-            col1, col2 = st.columns(2)
+            # Show data overview first
+            st.write(f"**Dataset Size:** {filtered_filings.shape[0]} rows × {filtered_filings.shape[1]} columns")
+            st.write("**First 5 rows:**")
+            st.dataframe(filtered_filings.head())
             
-            with col1:
-                # Select columns for plotting
-                numeric_cols = filtered_filings.select_dtypes(include=['number']).columns.tolist()
-                categorical_cols = filtered_filings.select_dtypes(include=['object', 'category']).columns.tolist()
-                
-                x_axis = st.selectbox("X-axis", numeric_cols + categorical_cols, key="x_axis")
-                y_axis = st.selectbox("Y-axis", numeric_cols, key="y_axis")
-                
-            with col2:
-                plot_type = st.selectbox("Plot Type", ["Scatter", "Line", "Bar", "Histogram", "Box"], key="plot_type")
-                color_by = st.selectbox("Color by (optional)", ["None"] + categorical_cols, key="color_by")
+            # Generate multiple plots automatically
+            st.subheader("📊 Generated Visualizations")
             
-            # Generate plot based on selection
-            if st.button("Generate Plot"):
-                try:
-                    color_col = None if color_by == "None" else color_by
-                    
-                    if plot_type == "Scatter":
-                        fig = px.scatter(filtered_filings, x=x_axis, y=y_axis, color=color_col,
-                                       title=f"{y_axis} vs {x_axis}")
-                    elif plot_type == "Line":
-                        fig = px.line(filtered_filings, x=x_axis, y=y_axis, color=color_col,
-                                     title=f"{y_axis} over {x_axis}")
-                    elif plot_type == "Bar":
-                        if x_axis in categorical_cols:
-                            agg_data = filtered_filings.groupby(x_axis)[y_axis].mean().reset_index()
-                            fig = px.bar(agg_data, x=x_axis, y=y_axis,
-                                       title=f"Average {y_axis} by {x_axis}")
-                        else:
-                            fig = px.bar(filtered_filings, x=x_axis, y=y_axis, color=color_col,
-                                       title=f"{y_axis} vs {x_axis}")
-                    elif plot_type == "Histogram":
-                        fig = px.histogram(filtered_filings, x=x_axis, color=color_col,
-                                         title=f"Distribution of {x_axis}")
-                    elif plot_type == "Box":
-                        if color_col:
-                            fig = px.box(filtered_filings, x=color_col, y=y_axis,
-                                       title=f"{y_axis} by {color_col}")
-                        else:
-                            fig = px.box(filtered_filings, y=y_axis,
-                                       title=f"Distribution of {y_axis}")
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                except Exception as e:
-                    st.error(f"Error generating plot: {str(e)}")
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            # Create 2x2 grid of plots
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+            
+            # Plot 1: Delinquency Rate Distribution
+            if 'delinquency_rate' in filtered_filings.columns:
+                filtered_filings['delinquency_rate'].hist(bins=20, ax=ax1, color='skyblue', alpha=0.7)
+                ax1.set_title('Delinquency Rate Distribution')
+                ax1.set_xlabel('Delinquency Rate')
+                ax1.set_ylabel('Frequency')
+                ax1.grid(True, alpha=0.3)
+            
+            # Plot 2: Asset Class Distribution
+            if 'asset_class' in filtered_filings.columns:
+                filtered_filings['asset_class'].value_counts().plot(kind='bar', ax=ax2, color='lightcoral')
+                ax2.set_title('Asset Class Distribution')
+                ax2.set_xlabel('Asset Class')
+                ax2.set_ylabel('Count')
+                ax2.tick_params(axis='x', rotation=45)
+                ax2.grid(True, alpha=0.3)
+            
+            # Plot 3: Current Balance Distribution
+            if 'current_balance' in filtered_filings.columns:
+                (filtered_filings['current_balance'] / 1e9).hist(bins=20, ax=ax3, color='lightgreen', alpha=0.7)
+                ax3.set_title('Current Balance Distribution')
+                ax3.set_xlabel('Current Balance ($B)')
+                ax3.set_ylabel('Frequency')
+                ax3.grid(True, alpha=0.3)
+            
+            # Plot 4: FICO vs Delinquency Scatter
+            if 'average_fico' in filtered_filings.columns and 'delinquency_rate' in filtered_filings.columns:
+                ax4.scatter(filtered_filings['average_fico'], filtered_filings['delinquency_rate'], alpha=0.6, color='purple')
+                ax4.set_title('FICO Score vs Delinquency Rate')
+                ax4.set_xlabel('Average FICO Score')
+                ax4.set_ylabel('Delinquency Rate')
+                ax4.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            st.pyplot(fig)
+            
+            # Additional relationship analysis
+            if len(filtered_filings.select_dtypes(include=['number']).columns) >= 2:
+                st.subheader("📈 Relationship Analysis")
+                fig3, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(16, 6))
+                
+                # Balance vs FICO scatter
+                if 'current_balance' in filtered_filings.columns and 'average_fico' in filtered_filings.columns:
+                    ax_left.scatter(filtered_filings['current_balance'] / 1e9, filtered_filings['average_fico'], alpha=0.6, color='green')
+                    ax_left.set_title('Current Balance vs FICO Score')
+                    ax_left.set_xlabel('Current Balance ($B)')
+                    ax_left.set_ylabel('Average FICO Score')
+                    ax_left.grid(True, alpha=0.3)
+                
+                # Original vs Current Balance
+                if 'original_balance' in filtered_filings.columns and 'current_balance' in filtered_filings.columns:
+                    ax_right.scatter(filtered_filings['original_balance'] / 1e9, filtered_filings['current_balance'] / 1e9, alpha=0.6, color='red')
+                    ax_right.set_title('Original vs Current Balance')
+                    ax_right.set_xlabel('Original Balance ($B)')
+                    ax_right.set_ylabel('Current Balance ($B)')
+                    ax_right.grid(True, alpha=0.3)
+                
+                plt.tight_layout()
+                st.pyplot(fig3)
+            
+            # Correlation heatmap
+            numeric_cols = filtered_filings.select_dtypes(include=['number']).columns
+            if len(numeric_cols) > 1:
+                st.subheader("📈 Correlation Matrix")
+                fig2, ax = plt.subplots(figsize=(12, 8))
+                correlation_matrix = filtered_filings[numeric_cols].corr()
+                sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax, fmt='.2f')
+                ax.set_title('Correlation Matrix')
+                st.pyplot(fig2)
+                
         else:
             st.info("No data available for plotting. Please adjust your filters.")
 
