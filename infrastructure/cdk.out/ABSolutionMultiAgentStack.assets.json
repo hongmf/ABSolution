@@ -1,0 +1,36 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "85feb541297b59242adeab6c226aadeba8e35bef63e6094424d0fda4e2cef0ea": {
+      "displayName": "AgentCoordinator/Code",
+      "source": {
+        "path": "asset.85feb541297b59242adeab6c226aadeba8e35bef63e6094424d0fda4e2cef0ea",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "060266714128-us-east-1-42c2689c": {
+          "bucketName": "cdk-hnb659fds-assets-060266714128-us-east-1",
+          "objectKey": "85feb541297b59242adeab6c226aadeba8e35bef63e6094424d0fda4e2cef0ea.zip",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::060266714128:role/cdk-hnb659fds-file-publishing-role-060266714128-us-east-1"
+        }
+      }
+    },
+    "75b58339fead791df602480c1e398e45e9a8d5d39a553e92f50e7701904828f2": {
+      "displayName": "ABSolutionMultiAgentStack Template",
+      "source": {
+        "path": "ABSolutionMultiAgentStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "060266714128-us-east-1-f1e370dd": {
+          "bucketName": "cdk-hnb659fds-assets-060266714128-us-east-1",
+          "objectKey": "75b58339fead791df602480c1e398e45e9a8d5d39a553e92f50e7701904828f2.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::060266714128:role/cdk-hnb659fds-file-publishing-role-060266714128-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
