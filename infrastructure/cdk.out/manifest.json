@@ -11,7 +11,7 @@
     },
     "ABSolutionMultiAgentStack": {
       "type": "aws:cloudformation:stack",
-      "environment": "aws://060266714128/us-east-1",
+      "environment": "aws://193099656739/us-west-2",
       "properties": {
         "templateFile": "ABSolutionMultiAgentStack.template.json",
         "terminationProtection": false,
@@ -21,16 +21,16 @@
           "Project": "ABSolution"
         },
         "validateOnSynth": false,
-        "assumeRoleArn": "arn:${AWS::Partition}:iam::060266714128:role/cdk-hnb659fds-deploy-role-060266714128-us-east-1",
-        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::060266714128:role/cdk-hnb659fds-cfn-exec-role-060266714128-us-east-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-060266714128-us-east-1/75b58339fead791df602480c1e398e45e9a8d5d39a553e92f50e7701904828f2.json",
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::193099656739:role/cdk-hnb659fds-deploy-role-193099656739-us-west-2",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::193099656739:role/cdk-hnb659fds-cfn-exec-role-193099656739-us-west-2",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-193099656739-us-west-2/0cff2a6bc456593ef645a026b029dccbeea0875418d95d63c8d374a52ea36e98.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
           "ABSolutionMultiAgentStack.assets"
         ],
         "lookupRole": {
-          "arn": "arn:${AWS::Partition}:iam::060266714128:role/cdk-hnb659fds-lookup-role-060266714128-us-east-1",
+          "arn": "arn:${AWS::Partition}:iam::193099656739:role/cdk-hnb659fds-lookup-role-193099656739-us-west-2",
           "requiresBootstrapStackVersion": 8,
           "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
         }
@@ -161,7 +161,7 @@
         "/ABSolutionMultiAgentStack/DialogueAPI/Deployment/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "DialogueAPIDeploymentCEC7947Fd39e91cd194df2470b0b9f1adbdcb8de"
+            "data": "DialogueAPIDeploymentCEC7947F3a1dc1c4f1c7ee60c78b40c5c224e38c"
           }
         ],
         "/ABSolutionMultiAgentStack/DialogueAPI/DeploymentStage.prod/Resource": [
