@@ -64,25 +64,22 @@ This automated script will:
 
 ### Step 3: Configure Bedrock
 
-After deployment, enable Bedrock models:
+After deployment, enable Bedrock models (Console only):
 
 ```bash
-# Via AWS Console:
+# MUST use AWS Console - no CLI option available:
 # 1. Go to Amazon Bedrock console
 # 2. Navigate to "Model access"
-# 3. Enable "Claude" models
-# 4. Wait for approval (usually instant)
-
-# Or via CLI:
-aws bedrock put-foundation-model-entitlement \
-  --model-id anthropic.claude-v2
+# 3. Click "Request model access"
+# 4. Enable "Claude 3 Haiku" or "Claude 3.5 Sonnet"
+# 5. Wait for approval (usually instant)
 ```
 
 ### Step 4: Test
 
 ```bash
 # Get API endpoint from deployment output
-export API_ENDPOINT="https://your-api-id.execute-api.us-east-1.amazonaws.com/prod"
+export API_ENDPOINT="https://8behc61ju4.execute-api.us-east-1.amazonaws.com/prod"
 
 # Test session creation
 curl -X POST $API_ENDPOINT/session \
