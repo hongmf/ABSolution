@@ -61,7 +61,7 @@ pip install -r requirements.txt
 echo ""
 echo -e "${YELLOW}Installing CDK dependencies...${NC}"
 cd infrastructure
-pip install -r requirements.txt 2>/dev/null || pip install aws-cdk-lib constructs
+pip install -q -r requirements.txt
 cd ..
 
 # Get AWS account and region
@@ -85,7 +85,9 @@ fi
 # Bootstrap CDK (if not already done)
 echo ""
 echo -e "${YELLOW}Bootstrapping CDK environment...${NC}"
+cd infrastructure
 cdk bootstrap aws://$AWS_ACCOUNT/$AWS_REGION || true
+cd ..
 
 # Package Lambda functions
 echo ""
@@ -99,7 +101,8 @@ cd ../..
 echo ""
 echo -e "${YELLOW}Deploying infrastructure stack...${NC}"
 cd infrastructure
-cdk deploy MultiAgentStack --require-approval never
+cdk deploy ABSolutionMultiAgentStack --require-approval never
+cd ..
 
 # Get outputs
 echo ""
@@ -107,7 +110,7 @@ echo -e "${GREEN}Deployment successful!${NC}"
 echo ""
 echo "Getting stack outputs..."
 API_ENDPOINT=$(aws cloudformation describe-stacks \
-    --stack-name MultiAgentStack \
+    --stack-name ABSolutionMultiAgentStack \
     --query 'Stacks[0].Outputs[?OutputKey==`DialogueAPIEndpoint`].OutputValue' \
     --output text 2>/dev/null || echo "Not available")
 
@@ -132,5 +135,3 @@ echo ""
 echo "4. View documentation:"
 echo "   docs/multi_agent_system.md"
 echo ""
-
-cd ..
