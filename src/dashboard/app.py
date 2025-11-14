@@ -31,6 +31,166 @@ predictor = SageMakerPredictor(endpoint_name=sagemaker_endpoint)
 logger.info("Loading historical delinquency data...")
 historical_data = generate_sample_historical_data(n_periods=36)
 
+# Generate initial predictions
+logger.info("Generating initial predictions...")
+initial_predictions = predictor.predict_delinquencies(historical_data, periods_ahead=12)
+
+
+def create_delinquencies_figure(historical_data, predictions, show_confidence=True):
+    """
+    Create delinquencies chart figure
+
+    Args:
+        historical_data: DataFrame with historical data
+        predictions: DataFrame with predictions
+        show_confidence: Whether to show confidence intervals
+
+    Returns:
+        Plotly figure object
+    """
+    combined_data = pd.concat([historical_data, predictions], ignore_index=True)
+
+    fig = go.Figure()
+
+    if combined_data.empty:
+        logger.error("No data available for chart")
+        fig.add_annotation(
+            text="No data available. Please check the logs.",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=20, color="red")
+        )
+        return fig
+
+    colors = {
+        '30_days': {'historical': '#3498db', 'prediction': '#5dade2'},
+        '60_days': {'historical': '#f39c12', 'prediction': '#f8c471'},
+        '90_plus_days': {'historical': '#e74c3c', 'prediction': '#ec7063'}
+    }
+
+    categories = [
+        ('delinquency_30_days', '30-Day Delinquencies', '30_days'),
+        ('delinquency_60_days', '60-Day Delinquencies', '60_days'),
+        ('delinquency_90_plus_days', '90+ Day Delinquencies', '90_plus_days')
+    ]
+
+    for col_name, display_name, color_key in categories:
+        # Historical data (solid lines)
+        historical_df = combined_data[~combined_data['is_prediction']]
+        if not historical_df.empty:
+            fig.add_trace(go.Scatter(
+                x=historical_df['date'],
+                y=historical_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Historical)',
+                line=dict(color=colors[color_key]['historical'], width=3),
+                marker=dict(size=6),
+                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Rate: %{y:.2%}<extra></extra>'
+            ))
+
+        # Predicted data (dashed lines)
+        prediction_df = combined_data[combined_data['is_prediction']]
+        if not prediction_df.empty:
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Predicted)',
+                line=dict(color=colors[color_key]['prediction'], width=3, dash='dash'),
+                marker=dict(size=6, symbol='diamond'),
+                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Predicted Rate: %{y:.2%}<extra></extra>'
+            ))
+
+        # Add confidence intervals if enabled
+        if show_confidence and not prediction_df.empty:
+            # Upper confidence bound
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name] * 1.15,
+                mode='lines',
+                name=f'{display_name} Upper Bound',
+                line=dict(color=colors[color_key]['prediction'], width=1, dash='dot'),
+                opacity=0.3,
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Lower confidence bound
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name] * 0.85,
+                mode='lines',
+                name=f'{display_name} Lower Bound',
+                line=dict(color=colors[color_key]['prediction'], width=1, dash='dot'),
+                opacity=0.3,
+                fill='tonexty',
+                fillcolor=colors[color_key]['prediction'].replace(')', ', 0.1)').replace('rgb', 'rgba'),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+    # Add vertical line to separate historical from predictions
+    if not historical_data.empty:
+        last_historical_date = historical_data['date'].iloc[-1]
+        # Add shape instead of vline to avoid timestamp issues
+        fig.add_shape(
+            type="line",
+            x0=last_historical_date,
+            x1=last_historical_date,
+            y0=0,
+            y1=1,
+            yref="paper",
+            line=dict(color="gray", width=2, dash="dash"),
+            opacity=0.5
+        )
+        # Add annotation
+        fig.add_annotation(
+            x=last_historical_date,
+            y=1,
+            yref="paper",
+            text="Prediction Start",
+            showarrow=False,
+            yshift=10,
+            font=dict(size=10, color="gray")
+        )
+
+    # Update layout
+    fig.update_layout(
+        title={
+            'text': 'Delinquency Rates: Historical Data & ML Predictions',
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 20, 'color': '#2c3e50'}
+        },
+        xaxis_title='Date',
+        yaxis_title='Delinquency Rate (%)',
+        yaxis_tickformat='.1%',
+        hovermode='x unified',
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="gray",
+            borderwidth=1
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font={'family': 'Arial, sans-serif'},
+        height=600,
+        xaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5),
+        yaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5)
+    )
+
+    return fig
+
+
+# Create initial figure
+initial_figure = create_delinquencies_figure(historical_data, initial_predictions, show_confidence=True)
+
+
 # Dashboard Layout
 app.layout = html.Div([
     html.Div([
@@ -82,6 +242,7 @@ app.layout = html.Div([
 
         dcc.Graph(
             id='delinquencies-chart',
+            figure=initial_figure,
             config={'displayModeBar': True, 'displaylogo': False}
         ),
 
@@ -178,8 +339,7 @@ app.layout = html.Div([
 @callback(
     Output('delinquencies-chart', 'figure'),
     [Input('prediction-periods-slider', 'value'),
-     Input('show-confidence', 'value')],
-    prevent_initial_call=False
+     Input('show-confidence', 'value')]
 )
 def update_delinquencies_chart(prediction_periods, show_confidence):
     """
@@ -204,159 +364,13 @@ def update_delinquencies_chart(prediction_periods, show_confidence):
         periods_ahead=prediction_periods
     )
 
-    # Combine historical and prediction data
-    combined_data = pd.concat([historical_data, fresh_predictions], ignore_index=True)
+    logger.info(f"Generated {len(fresh_predictions)} prediction records")
 
-    # Create figure
-    fig = go.Figure()
+    # Determine if confidence intervals should be shown
+    show_conf = show_confidence and 'show' in show_confidence
 
-    # Check if we have data
-    if combined_data.empty:
-        logger.error("No data available for chart")
-        fig.add_annotation(
-            text="No data available. Please check the logs.",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="red")
-        )
-        return fig
-
-    # Define colors for different delinquency categories
-    colors = {
-        '30_days': {'historical': '#3498db', 'prediction': '#5dade2'},
-        '60_days': {'historical': '#f39c12', 'prediction': '#f8c471'},
-        '90_plus_days': {'historical': '#e74c3c', 'prediction': '#ec7063'}
-    }
-
-    # Define categories with display names
-    categories = [
-        ('delinquency_30_days', '30-Day Delinquencies', '30_days'),
-        ('delinquency_60_days', '60-Day Delinquencies', '60_days'),
-        ('delinquency_90_plus_days', '90+ Day Delinquencies', '90_plus_days')
-    ]
-
-    logger.info(f"Combined data shape: {combined_data.shape}")
-    logger.info(f"Historical records: {(~combined_data['is_prediction']).sum()}")
-    logger.info(f"Prediction records: {combined_data['is_prediction'].sum()}")
-
-    for col_name, display_name, color_key in categories:
-        # Historical data (solid lines)
-        historical_df = combined_data[~combined_data['is_prediction']]
-        if not historical_df.empty:
-            fig.add_trace(go.Scatter(
-                x=historical_df['date'],
-                y=historical_df[col_name],
-                mode='lines+markers',
-                name=f'{display_name} (Historical)',
-                line=dict(
-                    color=colors[color_key]['historical'],
-                    width=3
-                ),
-                marker=dict(size=6),
-                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Rate: %{y:.2%}<extra></extra>'
-            ))
-
-        # Predicted data (dashed lines with different colors)
-        prediction_df = combined_data[combined_data['is_prediction']]
-        if not prediction_df.empty:
-            fig.add_trace(go.Scatter(
-                x=prediction_df['date'],
-                y=prediction_df[col_name],
-                mode='lines+markers',
-                name=f'{display_name} (Predicted)',
-                line=dict(
-                    color=colors[color_key]['prediction'],
-                    width=3,
-                    dash='dash'  # Dashed line for predictions
-                ),
-                marker=dict(size=6, symbol='diamond'),
-                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Predicted Rate: %{y:.2%}<extra></extra>'
-            ))
-
-        # Add confidence intervals if enabled
-        if show_confidence and 'show' in show_confidence and not prediction_df.empty:
-            # Upper confidence bound (lighter dashed line)
-            fig.add_trace(go.Scatter(
-                x=prediction_df['date'],
-                y=prediction_df[col_name] * 1.15,  # +15% confidence bound
-                mode='lines',
-                name=f'{display_name} Upper Bound',
-                line=dict(
-                    color=colors[color_key]['prediction'],
-                    width=1,
-                    dash='dot'
-                ),
-                opacity=0.3,
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-
-            # Lower confidence bound (lighter dashed line)
-            fig.add_trace(go.Scatter(
-                x=prediction_df['date'],
-                y=prediction_df[col_name] * 0.85,  # -15% confidence bound
-                mode='lines',
-                name=f'{display_name} Lower Bound',
-                line=dict(
-                    color=colors[color_key]['prediction'],
-                    width=1,
-                    dash='dot'
-                ),
-                opacity=0.3,
-                fill='tonexty',  # Fill to previous trace
-                fillcolor=colors[color_key]['prediction'].replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-
-    # Add vertical line to separate historical from predictions
-    last_historical_date = historical_data['date'].iloc[-1]
-    fig.add_vline(
-        x=last_historical_date,
-        line_dash="dash",
-        line_color="gray",
-        opacity=0.5,
-        annotation_text="Prediction Start",
-        annotation_position="top"
-    )
-
-    # Update layout
-    fig.update_layout(
-        title={
-            'text': 'Delinquency Rates: Historical Data & ML Predictions',
-            'x': 0.5,
-            'xanchor': 'center',
-            'font': {'size': 20, 'color': '#2c3e50'}
-        },
-        xaxis_title='Date',
-        yaxis_title='Delinquency Rate (%)',
-        yaxis_tickformat='.1%',
-        hovermode='x unified',
-        legend=dict(
-            orientation="v",
-            yanchor="top",
-            y=0.99,
-            xanchor="left",
-            x=0.01,
-            bgcolor="rgba(255,255,255,0.8)",
-            bordercolor="gray",
-            borderwidth=1
-        ),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        font={'family': 'Arial, sans-serif'},
-        height=600,
-        xaxis=dict(
-            showgrid=True,
-            gridcolor='lightgray',
-            gridwidth=0.5
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor='lightgray',
-            gridwidth=0.5
-        )
-    )
+    # Create figure using helper function
+    fig = create_delinquencies_figure(historical_data, fresh_predictions, show_confidence=show_conf)
 
     return fig
 
