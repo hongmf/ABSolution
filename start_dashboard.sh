@@ -48,7 +48,7 @@ if ! command -v python &> /dev/null; then
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
+PYTHON_VERSION=$(python --version | cut -d' ' -f2)
 print_info "Python version: $PYTHON_VERSION"
 
 # Check if virtual environment exists
