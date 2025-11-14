@@ -43,7 +43,7 @@ echo "=========================================="
 echo ""
 
 # Check if Python is installed
-if ! command -v python3 &> /dev/null; then
+if ! command -v python &> /dev/null; then
     print_error "Python 3 is not installed. Please install Python 3.8 or higher."
     exit 1
 fi
@@ -54,7 +54,7 @@ print_info "Python version: $PYTHON_VERSION"
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
     print_warning "Virtual environment not found. Creating one..."
-    python3 -m venv venv
+    python -m venv venv
     print_success "Virtual environment created"
 fi
 
