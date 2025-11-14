@@ -101,8 +101,9 @@ class SageMakerPredictor:
         """
         Generate predictions using a simple time-series forecasting model
         This is a fallback when SageMaker endpoint is not available
+        Uses Exponential Smoothing with Linear Trend
         """
-        logger.info("Using local prediction model")
+        logger.info("Using local prediction model (Exponential Smoothing)")
 
         # Get historical trends
         recent_data = historical_data.tail(12)  # Last 12 periods
@@ -145,6 +146,86 @@ class SageMakerPredictor:
             predictions.append(pred)
 
         return self._format_predictions(historical_data, predictions, periods_ahead)
+
+    def _predict_malp(self, historical_data, periods_ahead):
+        """
+        Generate predictions using MALP (Moving Average Linear Prediction)
+        Uses weighted moving averages with polynomial trend fitting
+        """
+        logger.info("Using MALP (Moving Average Linear Prediction) model")
+
+        # Use more historical data for better trend estimation
+        window_size = min(24, len(historical_data))  # Last 24 periods or all available
+        recent_data = historical_data.tail(window_size)
+
+        # Calculate trends for each delinquency category
+        categories = ['30_days', '60_days', '90_plus_days']
+        predictions = []
+
+        for i in range(1, periods_ahead + 1):
+            pred = {'period': i}
+
+            for category in categories:
+                col_name = f'delinquency_{category}'
+                if col_name in recent_data.columns:
+                    values = recent_data[col_name].values
+
+                    # Apply weighted moving average (more weight to recent values)
+                    weights = np.exp(np.linspace(-1, 0, len(values)))
+                    weights = weights / weights.sum()
+                    weighted_avg = np.average(values, weights=weights)
+
+                    # Fit polynomial trend (degree 2 for slight curvature)
+                    x = np.arange(len(values))
+                    coeffs = np.polyfit(x, values, deg=2)
+
+                    # Predict using polynomial extrapolation
+                    future_x = len(values) + i - 1
+                    poly_prediction = np.polyval(coeffs, future_x)
+
+                    # Combine weighted average with polynomial prediction
+                    # Give more weight to polynomial for longer horizons
+                    blend_factor = min(i / periods_ahead, 0.7)
+                    predicted_value = (1 - blend_factor) * weighted_avg + blend_factor * poly_prediction
+
+                    # Add slight dampening for stability
+                    dampening = 1 - (0.02 * i)  # 2% dampening per period
+                    predicted_value = predicted_value * dampening
+
+                    # Ensure values stay in reasonable range (0-1 for rates)
+                    predicted_value = max(0, min(1, predicted_value))
+
+                    pred[col_name] = predicted_value
+                else:
+                    pred[col_name] = 0.02  # Default value
+
+            # Add confidence intervals
+            pred['confidence_lower'] = 0.8
+            pred['confidence_upper'] = 1.2
+
+            predictions.append(pred)
+
+        return self._format_predictions(historical_data, predictions, periods_ahead)
+
+    def predict_delinquencies_malp(self, historical_data, periods_ahead=12):
+        """
+        Predict future delinquency rates using MALP algorithm
+
+        Args:
+            historical_data: DataFrame with historical delinquency data
+            periods_ahead: Number of future periods to predict
+
+        Returns:
+            DataFrame with predictions for different delinquency categories
+        """
+        logger.info(f"Predicting delinquencies for {periods_ahead} periods ahead using MALP")
+
+        try:
+            return self._predict_malp(historical_data, periods_ahead)
+        except Exception as e:
+            logger.error(f"Error making MALP predictions: {str(e)}")
+            # Fallback to simple prediction
+            return self._predict_local(historical_data, periods_ahead)
 
     def _prepare_features(self, historical_data, last_row, period_ahead):
         """
