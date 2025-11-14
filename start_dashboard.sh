@@ -64,14 +64,20 @@ source venv/bin/activate
 
 # Install/upgrade dependencies
 print_info "Checking dependencies..."
-if [ -f "requirements.txt" ]; then
-    print_info "Installing/upgrading dependencies from requirements.txt..."
-    pip install --upgrade pip > /dev/null 2>&1
-    pip install -r requirements.txt > /dev/null 2>&1
+if [ -f "requirements-dashboard.txt" ]; then
+    print_info "Installing dashboard dependencies from requirements-dashboard.txt..."
+    pip install --upgrade pip --quiet
+    pip install -r requirements-dashboard.txt --quiet
+    print_success "Dependencies installed"
+elif [ -f "requirements.txt" ]; then
+    print_warning "Using full requirements.txt (this may take a while)..."
+    pip install --upgrade pip --quiet
+    pip install -r requirements.txt --quiet
     print_success "Dependencies installed"
 else
-    print_warning "requirements.txt not found. Installing essential packages..."
-    pip install dash plotly pandas numpy boto3 > /dev/null 2>&1
+    print_warning "No requirements file found. Installing essential packages..."
+    pip install dash plotly pandas numpy boto3 --quiet
+    print_success "Essential packages installed"
 fi
 
 # Load environment variables from .env if it exists
