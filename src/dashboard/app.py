@@ -31,70 +31,6 @@ predictor = SageMakerPredictor(endpoint_name=sagemaker_endpoint)
 logger.info("Loading historical delinquency data...")
 historical_data = generate_sample_historical_data(n_periods=36)
 
-# Generate predictions
-logger.info("Generating predictions...")
-predictions = predictor.predict_delinquencies(historical_data, periods_ahead=12)
-
-
-def create_initial_figure():
-    """Create initial figure for the delinquencies chart"""
-    combined_data = pd.concat([historical_data, predictions], ignore_index=True)
-
-    fig = go.Figure()
-
-    colors = {
-        '30_days': {'historical': '#3498db', 'prediction': '#5dade2'},
-        '60_days': {'historical': '#f39c12', 'prediction': '#f8c471'},
-        '90_plus_days': {'historical': '#e74c3c', 'prediction': '#ec7063'}
-    }
-
-    categories = [
-        ('delinquency_30_days', '30-Day Delinquencies', '30_days'),
-        ('delinquency_60_days', '60-Day Delinquencies', '60_days'),
-        ('delinquency_90_plus_days', '90+ Day Delinquencies', '90_plus_days')
-    ]
-
-    for col_name, display_name, color_key in categories:
-        # Historical data
-        hist_df = combined_data[~combined_data['is_prediction']]
-        if not hist_df.empty:
-            fig.add_trace(go.Scatter(
-                x=hist_df['date'],
-                y=hist_df[col_name],
-                mode='lines+markers',
-                name=f'{display_name} (Historical)',
-                line=dict(color=colors[color_key]['historical'], width=3),
-                marker=dict(size=6)
-            ))
-
-        # Predictions
-        pred_df = combined_data[combined_data['is_prediction']]
-        if not pred_df.empty:
-            fig.add_trace(go.Scatter(
-                x=pred_df['date'],
-                y=pred_df[col_name],
-                mode='lines+markers',
-                name=f'{display_name} (Predicted)',
-                line=dict(color=colors[color_key]['prediction'], width=3, dash='dash'),
-                marker=dict(size=6, symbol='diamond')
-            ))
-
-    fig.update_layout(
-        title='Delinquency Rates: Historical Data & ML Predictions',
-        xaxis_title='Date',
-        yaxis_title='Delinquency Rate (%)',
-        yaxis_tickformat='.1%',
-        height=600,
-        hovermode='x unified'
-    )
-
-    return fig
-
-
-# Create initial figure
-initial_figure = create_initial_figure()
-
-
 # Dashboard Layout
 app.layout = html.Div([
     html.Div([
@@ -146,7 +82,6 @@ app.layout = html.Div([
 
         dcc.Graph(
             id='delinquencies-chart',
-            figure=initial_figure,
             config={'displayModeBar': True, 'displaylogo': False}
         ),
 
@@ -243,7 +178,8 @@ app.layout = html.Div([
 @callback(
     Output('delinquencies-chart', 'figure'),
     [Input('prediction-periods-slider', 'value'),
-     Input('show-confidence', 'value')]
+     Input('show-confidence', 'value')],
+    prevent_initial_call=False
 )
 def update_delinquencies_chart(prediction_periods, show_confidence):
     """
@@ -256,7 +192,11 @@ def update_delinquencies_chart(prediction_periods, show_confidence):
     Returns:
         Plotly figure object
     """
+    if prediction_periods is None:
+        prediction_periods = 12
+
     logger.info(f"Updating chart with {prediction_periods} prediction periods")
+    logger.info(f"Show confidence: {show_confidence}")
 
     # Generate fresh predictions based on slider value
     fresh_predictions = predictor.predict_delinquencies(
