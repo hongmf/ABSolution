@@ -33,7 +33,8 @@ historical_data = generate_sample_historical_data(n_periods=36)
 
 # Generate initial predictions
 logger.info("Generating initial predictions...")
-initial_predictions = predictor.predict_delinquencies(historical_data, periods_ahead=12)
+initial_predictions_xgboost = predictor.predict_delinquencies(historical_data, periods_ahead=12)
+initial_predictions_malp = predictor.predict_delinquencies_malp(historical_data, periods_ahead=12)
 
 
 def create_delinquencies_figure(historical_data, predictions, show_confidence=True):
@@ -198,8 +199,9 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
     return fig
 
 
-# Create initial figure
-initial_figure = create_delinquencies_figure(historical_data, initial_predictions, show_confidence=True)
+# Create initial figures
+initial_figure_xgboost = create_delinquencies_figure(historical_data, initial_predictions_xgboost, show_confidence=True)
+initial_figure_malp = create_delinquencies_figure(historical_data, initial_predictions_malp, show_confidence=True)
 
 
 # Dashboard Layout
@@ -219,9 +221,9 @@ app.layout = html.Div([
         }),
     ], style={'backgroundColor': '#ecf0f1', 'padding': '20px'}),
 
-    # Delinquencies Panel
+    # XGBoost Delinquencies Panel
     html.Div([
-        html.H2("Delinquencies Analysis", style={
+        html.H2("Delinquencies Prediction - XGBoost Model", style={
             'color': '#34495e',
             'fontFamily': 'Arial, sans-serif',
             'marginBottom': '20px'
@@ -252,8 +254,8 @@ app.layout = html.Div([
         ], style={'marginBottom': '20px'}),
 
         dcc.Graph(
-            id='delinquencies-chart',
-            figure=initial_figure,
+            id='delinquencies-chart-xgboost',
+            figure=initial_figure_xgboost,
             config={'displayModeBar': True, 'displaylogo': False}
         ),
 
@@ -267,6 +269,72 @@ app.layout = html.Div([
             html.P([
                 html.Strong("Last Updated: "),
                 html.Span(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            ]),
+        ], style={
+            'backgroundColor': '#f8f9fa',
+            'padding': '15px',
+            'borderRadius': '5px',
+            'marginTop': '20px'
+        })
+    ], style={
+        'backgroundColor': 'white',
+        'padding': '30px',
+        'margin': '20px',
+        'borderRadius': '10px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    }),
+
+    # MALP Delinquencies Panel
+    html.Div([
+        html.H2("Delinquencies Prediction - MALP Model", style={
+            'color': '#34495e',
+            'fontFamily': 'Arial, sans-serif',
+            'marginBottom': '20px'
+        }),
+        html.Div([
+            html.Div([
+                html.Label("Prediction Periods:", style={'fontWeight': 'bold'}),
+                dcc.Slider(
+                    id='prediction-periods-slider-malp',
+                    min=3,
+                    max=24,
+                    step=3,
+                    value=12,
+                    marks={i: f"{i}m" for i in range(3, 25, 3)},
+                    tooltip={"placement": "bottom", "always_visible": True}
+                ),
+            ], style={'width': '40%', 'display': 'inline-block', 'marginRight': '20px'}),
+
+            html.Div([
+                html.Label("Show Confidence Intervals:", style={'fontWeight': 'bold'}),
+                dcc.Checklist(
+                    id='show-confidence-malp',
+                    options=[{'label': ' Display', 'value': 'show'}],
+                    value=['show'],
+                    style={'marginTop': '10px'}
+                ),
+            ], style={'width': '20%', 'display': 'inline-block'}),
+        ], style={'marginBottom': '20px'}),
+
+        dcc.Graph(
+            id='delinquencies-chart-malp',
+            figure=initial_figure_malp,
+            config={'displayModeBar': True, 'displaylogo': False}
+        ),
+
+        html.Div([
+            html.H3("Model Information", style={'color': '#34495e', 'fontSize': '18px'}),
+            html.P([
+                html.Strong("Algorithm: "),
+                html.Span("MALP (Moving Average Linear Prediction)", style={'color': '#27ae60'})
+            ]),
+            html.P([
+                html.Strong("Method: "),
+                html.Span("Weighted moving averages with polynomial trend fitting")
+            ]),
+            html.P([
+                html.Strong("Window Size: "),
+                html.Span("24 periods for trend estimation")
             ]),
         ], style={
             'backgroundColor': '#f8f9fa',
@@ -348,7 +416,7 @@ app.layout = html.Div([
 
 
 @callback(
-    Output('delinquencies-chart', 'figure'),
+    Output('delinquencies-chart-xgboost', 'figure'),
     [Input('prediction-periods-slider', 'value'),
      Input('show-confidence', 'value')]
 )
@@ -376,6 +444,45 @@ def update_delinquencies_chart(prediction_periods, show_confidence):
     )
 
     logger.info(f"Generated {len(fresh_predictions)} prediction records")
+
+    # Determine if confidence intervals should be shown
+    show_conf = show_confidence and 'show' in show_confidence
+
+    # Create figure using helper function
+    fig = create_delinquencies_figure(historical_data, fresh_predictions, show_confidence=show_conf)
+
+    return fig
+
+
+@callback(
+    Output('delinquencies-chart-malp', 'figure'),
+    [Input('prediction-periods-slider-malp', 'value'),
+     Input('show-confidence-malp', 'value')]
+)
+def update_delinquencies_chart_malp(prediction_periods, show_confidence):
+    """
+    Update MALP delinquencies chart with historical data and predictions
+
+    Args:
+        prediction_periods: Number of future periods to predict
+        show_confidence: Whether to show confidence intervals
+
+    Returns:
+        Plotly figure object
+    """
+    if prediction_periods is None:
+        prediction_periods = 12
+
+    logger.info(f"Updating MALP chart with {prediction_periods} prediction periods")
+    logger.info(f"Show confidence: {show_confidence}")
+
+    # Generate fresh predictions based on slider value using MALP
+    fresh_predictions = predictor.predict_delinquencies_malp(
+        historical_data,
+        periods_ahead=prediction_periods
+    )
+
+    logger.info(f"Generated {len(fresh_predictions)} MALP prediction records")
 
     # Determine if confidence intervals should be shown
     show_conf = show_confidence and 'show' in show_confidence
