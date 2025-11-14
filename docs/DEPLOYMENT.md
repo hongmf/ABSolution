@@ -83,8 +83,21 @@ Your AWS user/role needs permissions to:
 git clone <repository-url>
 cd ABSolution
 
-# Install Python dependencies
-pip install -r requirements.txt
+# Set up virtual environment and install dependencies
+# For Linux/Mac:
+./setup.sh
+
+# For Windows (Command Prompt):
+# setup.bat
+
+# For Windows (PowerShell):
+# .\setup.ps1
+
+# Or manually:
+# python3 -m venv venv
+# source venv/bin/activate  # On Linux/Mac
+# venv\Scripts\activate     # On Windows
+# pip install -r requirements.txt
 
 # Set up environment variables
 cp config/aws_config.yaml config/aws_config.local.yaml
