@@ -26,8 +26,20 @@ class SageMakerPredictor:
             endpoint_name: Name of the SageMaker endpoint
         """
         self.endpoint_name = endpoint_name or os.environ.get('SAGEMAKER_ENDPOINT_NAME')
-        self.runtime = boto3.client('sagemaker-runtime')
+        self.runtime = None  # Lazy initialization
+        self._region = os.environ.get('AWS_REGION', 'us-east-1')
         logger.info(f"Initialized SageMaker client with endpoint: {self.endpoint_name}")
+
+    def _get_runtime_client(self):
+        """Lazy initialization of boto3 runtime client"""
+        if self.runtime is None:
+            try:
+                self.runtime = boto3.client('sagemaker-runtime', region_name=self._region)
+                logger.info(f"Created SageMaker runtime client in region: {self._region}")
+            except Exception as e:
+                logger.error(f"Failed to create SageMaker runtime client: {str(e)}")
+                raise
+        return self.runtime
 
     def predict_delinquencies(self, historical_data, periods_ahead=12):
         """
@@ -72,7 +84,7 @@ class SageMakerPredictor:
                 'instances': [features]
             }
 
-            response = self.runtime.invoke_endpoint(
+            response = self._get_runtime_client().invoke_endpoint(
                 EndpointName=self.endpoint_name,
                 ContentType='application/json',
                 Body=json.dumps(payload)

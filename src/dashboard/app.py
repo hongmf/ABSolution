@@ -349,7 +349,7 @@ if __name__ == '__main__':
     logger.info(f"Debug mode: {debug_mode}")
     logger.info(f"SageMaker endpoint: {sagemaker_endpoint or 'Not configured (using local predictions)'}")
 
-    app.run_server(
+    app.run(
         debug=debug_mode,
         host='0.0.0.0',
         port=port
