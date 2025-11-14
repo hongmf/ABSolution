@@ -36,6 +36,65 @@ logger.info("Generating predictions...")
 predictions = predictor.predict_delinquencies(historical_data, periods_ahead=12)
 
 
+def create_initial_figure():
+    """Create initial figure for the delinquencies chart"""
+    combined_data = pd.concat([historical_data, predictions], ignore_index=True)
+
+    fig = go.Figure()
+
+    colors = {
+        '30_days': {'historical': '#3498db', 'prediction': '#5dade2'},
+        '60_days': {'historical': '#f39c12', 'prediction': '#f8c471'},
+        '90_plus_days': {'historical': '#e74c3c', 'prediction': '#ec7063'}
+    }
+
+    categories = [
+        ('delinquency_30_days', '30-Day Delinquencies', '30_days'),
+        ('delinquency_60_days', '60-Day Delinquencies', '60_days'),
+        ('delinquency_90_plus_days', '90+ Day Delinquencies', '90_plus_days')
+    ]
+
+    for col_name, display_name, color_key in categories:
+        # Historical data
+        hist_df = combined_data[~combined_data['is_prediction']]
+        if not hist_df.empty:
+            fig.add_trace(go.Scatter(
+                x=hist_df['date'],
+                y=hist_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Historical)',
+                line=dict(color=colors[color_key]['historical'], width=3),
+                marker=dict(size=6)
+            ))
+
+        # Predictions
+        pred_df = combined_data[combined_data['is_prediction']]
+        if not pred_df.empty:
+            fig.add_trace(go.Scatter(
+                x=pred_df['date'],
+                y=pred_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Predicted)',
+                line=dict(color=colors[color_key]['prediction'], width=3, dash='dash'),
+                marker=dict(size=6, symbol='diamond')
+            ))
+
+    fig.update_layout(
+        title='Delinquency Rates: Historical Data & ML Predictions',
+        xaxis_title='Date',
+        yaxis_title='Delinquency Rate (%)',
+        yaxis_tickformat='.1%',
+        height=600,
+        hovermode='x unified'
+    )
+
+    return fig
+
+
+# Create initial figure
+initial_figure = create_initial_figure()
+
+
 # Dashboard Layout
 app.layout = html.Div([
     html.Div([
@@ -87,6 +146,7 @@ app.layout = html.Div([
 
         dcc.Graph(
             id='delinquencies-chart',
+            figure=initial_figure,
             config={'displayModeBar': True, 'displaylogo': False}
         ),
 
