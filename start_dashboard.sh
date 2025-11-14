@@ -73,12 +73,12 @@ fi
 print_info "Checking dependencies..."
 if [ -f "requirements-dashboard.txt" ]; then
     print_info "Installing dashboard dependencies from requirements-dashboard.txt..."
-    pip install --upgrade pip --quiet
+    # pip install --upgrade pip --quiet
     pip install -r requirements-dashboard.txt --quiet
     print_success "Dependencies installed"
 elif [ -f "requirements.txt" ]; then
     print_warning "Using full requirements.txt (this may take a while)..."
-    pip install --upgrade pip --quiet
+    # pip install --upgrade pip --quiet
     pip install -r requirements.txt --quiet
     print_success "Dependencies installed"
 else
