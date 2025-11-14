@@ -75,7 +75,36 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
     ]
 
     for col_name, display_name, color_key in categories:
-        # Historical data (solid lines)
+        # Add confidence intervals FIRST (so they appear behind the lines)
+        prediction_df = combined_data[combined_data['is_prediction']]
+
+        if show_confidence and not prediction_df.empty:
+            # Upper confidence bound (transparent fill)
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name] * 1.15,
+                mode='lines',
+                name=f'{display_name} Confidence',
+                line=dict(width=0),
+                fillcolor=colors[color_key]['prediction'].replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Lower confidence bound (fills to upper bound)
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name] * 0.85,
+                mode='lines',
+                name=f'{display_name} Confidence Lower',
+                line=dict(width=0),
+                fill='tonexty',
+                fillcolor=colors[color_key]['prediction'].replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+        # Historical data (solid lines) - drawn AFTER confidence intervals
         historical_df = combined_data[~combined_data['is_prediction']]
         if not historical_df.empty:
             fig.add_trace(go.Scatter(
@@ -88,8 +117,7 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
                 hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Rate: %{y:.2%}<extra></extra>'
             ))
 
-        # Predicted data (dashed lines)
-        prediction_df = combined_data[combined_data['is_prediction']]
+        # Predicted data (dashed lines) - drawn ON TOP of confidence intervals
         if not prediction_df.empty:
             fig.add_trace(go.Scatter(
                 x=prediction_df['date'],
@@ -99,34 +127,6 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
                 line=dict(color=colors[color_key]['prediction'], width=3, dash='dash'),
                 marker=dict(size=6, symbol='diamond'),
                 hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Predicted Rate: %{y:.2%}<extra></extra>'
-            ))
-
-        # Add confidence intervals if enabled
-        if show_confidence and not prediction_df.empty:
-            # Upper confidence bound
-            fig.add_trace(go.Scatter(
-                x=prediction_df['date'],
-                y=prediction_df[col_name] * 1.15,
-                mode='lines',
-                name=f'{display_name} Upper Bound',
-                line=dict(color=colors[color_key]['prediction'], width=1, dash='dot'),
-                opacity=0.3,
-                showlegend=False,
-                hoverinfo='skip'
-            ))
-
-            # Lower confidence bound
-            fig.add_trace(go.Scatter(
-                x=prediction_df['date'],
-                y=prediction_df[col_name] * 0.85,
-                mode='lines',
-                name=f'{display_name} Lower Bound',
-                line=dict(color=colors[color_key]['prediction'], width=1, dash='dot'),
-                opacity=0.3,
-                fill='tonexty',
-                fillcolor=colors[color_key]['prediction'].replace(')', ', 0.1)').replace('rgb', 'rgba'),
-                showlegend=False,
-                hoverinfo='skip'
             ))
 
     # Add vertical line to separate historical from predictions
