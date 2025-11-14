@@ -63,9 +63,21 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
         return fig
 
     colors = {
-        '30_days': {'historical': '#3498db', 'prediction': '#5dade2'},
-        '60_days': {'historical': '#f39c12', 'prediction': '#f8c471'},
-        '90_plus_days': {'historical': '#e74c3c', 'prediction': '#ec7063'}
+        '30_days': {
+            'historical': '#3498db',
+            'prediction': '#5dade2',
+            'confidence': 'rgba(93, 173, 226, 0.2)'  # Light blue, 20% opacity
+        },
+        '60_days': {
+            'historical': '#f39c12',
+            'prediction': '#f8c471',
+            'confidence': 'rgba(248, 196, 113, 0.2)'  # Light orange, 20% opacity
+        },
+        '90_plus_days': {
+            'historical': '#e74c3c',
+            'prediction': '#ec7063',
+            'confidence': 'rgba(236, 112, 99, 0.2)'  # Light red, 20% opacity
+        }
     }
 
     categories = [
@@ -86,7 +98,6 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
                 mode='lines',
                 name=f'{display_name} Confidence',
                 line=dict(width=0),
-                fillcolor=colors[color_key]['prediction'].replace('rgb', 'rgba').replace(')', ', 0.15)'),
                 showlegend=False,
                 hoverinfo='skip'
             ))
@@ -99,7 +110,7 @@ def create_delinquencies_figure(historical_data, predictions, show_confidence=Tr
                 name=f'{display_name} Confidence Lower',
                 line=dict(width=0),
                 fill='tonexty',
-                fillcolor=colors[color_key]['prediction'].replace('rgb', 'rgba').replace(')', ', 0.15)'),
+                fillcolor=colors[color_key]['confidence'],
                 showlegend=False,
                 hoverinfo='skip'
             ))
