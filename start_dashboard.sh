@@ -90,7 +90,10 @@ fi
 # Load environment variables from .env if it exists
 if [ -f ".env" ]; then
     print_info "Loading environment variables from .env..."
-    export $(cat .env | grep -v '^#' | xargs)
+    # Safely load .env file, filtering out comments and empty lines
+    set -a
+    source <(grep -v '^#' .env | grep -v '^$' | sed 's/#.*$//')
+    set +a
     print_success "Environment variables loaded"
 else
     print_warning ".env file not found. Using default configuration."
