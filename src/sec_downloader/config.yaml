@@ -1,0 +1,120 @@
+# ABS Issuers Configuration
+# SEC filing download configuration for major ABS issuers
+
+issuers:
+  ford_credit:
+    name: "Ford Motor Credit Company"
+    cik: "38777"
+    full_legal_name: "Ford Motor Credit Company LLC"
+    tickers:
+      - "F"
+    asset_classes:
+      - "Auto Loans"
+      - "Auto Leases"
+    description: "Ford Motor Credit Company - Auto Loans and Leases"
+    website: "https://www.ford.com/finance/"
+
+  gm_financial:
+    name: "GM Financial"
+    cik: "1576940"
+    full_legal_name: "General Motors Financial Company, Inc."
+    tickers:
+      - "GM"
+    asset_classes:
+      - "Auto Loans"
+      - "Auto Leases"
+    description: "General Motors Financial Company - Auto Loans and Leases"
+    website: "https://www.gmfinancial.com/"
+
+  santander_consumer:
+    name: "Santander Consumer USA"
+    cik: "1548429"
+    full_legal_name: "Santander Consumer USA Holdings Inc."
+    tickers:
+      - "SC"
+    asset_classes:
+      - "Auto Loans"
+      - "Consumer Finance"
+      - "Personal Loans"
+    description: "Santander Consumer USA - Auto Loans and Consumer Finance"
+    website: "https://www.santanderconsumerusa.com/"
+
+# Additional major ABS issuers for future expansion
+additional_issuers:
+  ally_financial:
+    name: "Ally Financial"
+    cik: "40729"
+    full_legal_name: "Ally Financial Inc."
+    tickers:
+      - "ALLY"
+    asset_classes:
+      - "Auto Loans"
+      - "Auto Leases"
+
+  capital_one:
+    name: "Capital One"
+    cik: "927628"
+    full_legal_name: "Capital One Financial Corporation"
+    tickers:
+      - "COF"
+    asset_classes:
+      - "Credit Cards"
+      - "Auto Loans"
+
+  discover:
+    name: "Discover Financial Services"
+    cik: "1393612"
+    full_legal_name: "Discover Financial Services"
+    tickers:
+      - "DFS"
+    asset_classes:
+      - "Credit Cards"
+      - "Student Loans"
+      - "Personal Loans"
+
+# SEC Filing Types of Interest for ABS
+filing_types:
+  primary:
+    - form: "ABS-EE"
+      description: "ABS Informational and Computational Material"
+      frequency: "Event-driven"
+
+    - form: "10-D"
+      description: "Asset-Backed Issuer Distribution Report"
+      frequency: "Monthly"
+
+    - form: "ABS-15G"
+      description: "Asset-Backed Securities Report"
+      frequency: "Annual"
+
+  secondary:
+    - form: "10-K"
+      description: "Annual Report"
+      frequency: "Annual"
+
+    - form: "8-K"
+      description: "Current Report"
+      frequency: "Event-driven"
+
+    - form: "10-Q"
+      description: "Quarterly Report"
+      frequency: "Quarterly"
+
+# Download Settings
+download_settings:
+  default_lookback_days: 365
+  rate_limit_requests_per_second: 10
+  retry_attempts: 3
+  timeout_seconds: 30
+
+  # S3 configuration for AWS deployment
+  s3:
+    bucket_name: "absolution-sec-filings"
+    raw_prefix: "raw-filings"
+    processed_prefix: "processed-filings"
+    archive_prefix: "archive-filings"
+
+  # Local storage configuration
+  local:
+    base_directory: "./data/sec_filings"
+    structure: "issuer/year/form_type"

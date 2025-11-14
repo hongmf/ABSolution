@@ -1,0 +1,13 @@
+{
+  "deployment_time": "2025-11-13T05:37:57Z",
+  "environment": "dev",
+  "region": "us-east-1",
+  "stack_name": "absolution-platform-dev",
+  "account_id": "060266714128",
+  "api_endpoint": "https://qqdh4hrev0.execute-api.us-east-1.amazonaws.com/dev",
+  "raw_bucket": "abs-solution-raw-data-dev-060266714128",
+  "processed_bucket": "abs-solution-processed-data-dev-060266714128",
+  "kinesis_stream": "sec-filings-stream-dev",
+  "filings_table": "abs-filings-dev",
+  "duration_seconds": 33
+}
