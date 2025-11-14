@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 streamlit
 pandas
 matplotlib
@@ -61,4 +60,3 @@ seaborn>=0.13.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.1
 jsonschema>=4.20.0
->>>>>>> 9a6ab352210a0e14c82125e5f3a6ac4920f05553

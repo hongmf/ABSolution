@@ -2,7 +2,6 @@
 
 **AWS-Native Asset-Backed Securities Analytics Platform**
 
-<<<<<<< HEAD
 ABSolution is a comprehensive analytics platform for Asset-Backed Securities (ABS) that automatically downloads, processes, and analyzes SEC filings from major auto finance issuers. Built entirely on AWS serverless and AI services.
 
 ## Quick Start
@@ -291,8 +290,7 @@ python3 scripts/serve_ui.py
 - AI-powered Narrative + visualization
   Bedrock + QuickSight + Interactive Panel Dashboard
 - real-time streaming + predictive alerts
-<<<<<<< HEAD
->>>>>>> 51a0f88c9bb6b22029bf9ca97630fa86daa24c50
+
 =======
 
 ## Quick Start - Visualization Dashboard
