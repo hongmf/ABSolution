@@ -158,4 +158,4 @@ echo ""
 export PYTHONPATH="$SCRIPT_DIR/src:$PYTHONPATH"
 
 # Start the dashboard
-python3 "$SCRIPT_DIR/src/dashboard/app.py" 2>&1 | tee logs/dashboard_$(date +%Y%m%d_%H%M%S).log
+python "$SCRIPT_DIR/src/dashboard/app.py" 2>&1 | tee logs/dashboard_$(date +%Y%m%d_%H%M%S).log
