@@ -85,7 +85,10 @@ app.layout = html.Div([
             ], style={'width': '20%', 'display': 'inline-block'}),
         ], style={'marginBottom': '20px'}),
 
-        dcc.Graph(id='delinquencies-chart'),
+        dcc.Graph(
+            id='delinquencies-chart',
+            config={'displayModeBar': True, 'displaylogo': False}
+        ),
 
         html.Div([
             html.H3("Model Information", style={'color': '#34495e', 'fontSize': '18px'}),
@@ -207,6 +210,17 @@ def update_delinquencies_chart(prediction_periods, show_confidence):
     # Create figure
     fig = go.Figure()
 
+    # Check if we have data
+    if combined_data.empty:
+        logger.error("No data available for chart")
+        fig.add_annotation(
+            text="No data available. Please check the logs.",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=20, color="red")
+        )
+        return fig
+
     # Define colors for different delinquency categories
     colors = {
         '30_days': {'historical': '#3498db', 'prediction': '#5dade2'},
@@ -221,40 +235,46 @@ def update_delinquencies_chart(prediction_periods, show_confidence):
         ('delinquency_90_plus_days', '90+ Day Delinquencies', '90_plus_days')
     ]
 
+    logger.info(f"Combined data shape: {combined_data.shape}")
+    logger.info(f"Historical records: {(~combined_data['is_prediction']).sum()}")
+    logger.info(f"Prediction records: {combined_data['is_prediction'].sum()}")
+
     for col_name, display_name, color_key in categories:
         # Historical data (solid lines)
-        historical_df = combined_data[combined_data['is_prediction'] == False]
-        fig.add_trace(go.Scatter(
-            x=historical_df['date'],
-            y=historical_df[col_name],
-            mode='lines+markers',
-            name=f'{display_name} (Historical)',
-            line=dict(
-                color=colors[color_key]['historical'],
-                width=3
-            ),
-            marker=dict(size=6),
-            hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Rate: %{y:.2%}<extra></extra>'
-        ))
+        historical_df = combined_data[~combined_data['is_prediction']]
+        if not historical_df.empty:
+            fig.add_trace(go.Scatter(
+                x=historical_df['date'],
+                y=historical_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Historical)',
+                line=dict(
+                    color=colors[color_key]['historical'],
+                    width=3
+                ),
+                marker=dict(size=6),
+                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Rate: %{y:.2%}<extra></extra>'
+            ))
 
         # Predicted data (dashed lines with different colors)
-        prediction_df = combined_data[combined_data['is_prediction'] == True]
-        fig.add_trace(go.Scatter(
-            x=prediction_df['date'],
-            y=prediction_df[col_name],
-            mode='lines+markers',
-            name=f'{display_name} (Predicted)',
-            line=dict(
-                color=colors[color_key]['prediction'],
-                width=3,
-                dash='dash'  # Dashed line for predictions
-            ),
-            marker=dict(size=6, symbol='diamond'),
-            hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Predicted Rate: %{y:.2%}<extra></extra>'
-        ))
+        prediction_df = combined_data[combined_data['is_prediction']]
+        if not prediction_df.empty:
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Predicted)',
+                line=dict(
+                    color=colors[color_key]['prediction'],
+                    width=3,
+                    dash='dash'  # Dashed line for predictions
+                ),
+                marker=dict(size=6, symbol='diamond'),
+                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Predicted Rate: %{y:.2%}<extra></extra>'
+            ))
 
         # Add confidence intervals if enabled
-        if show_confidence and 'show' in show_confidence:
+        if show_confidence and 'show' in show_confidence and not prediction_df.empty:
             # Upper confidence bound (lighter dashed line)
             fig.add_trace(go.Scatter(
                 x=prediction_df['date'],
