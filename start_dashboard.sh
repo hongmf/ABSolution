@@ -59,8 +59,15 @@ if [ ! -d "venv" ]; then
 fi
 
 # Activate virtual environment
-print_info "Activating virtual environment..."
-source venv/bin/activate
+echo -e "${GREEN}Activating virtual environment...${NC}"
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+elif [ -f "venv/Scripts/activate" ]; then
+    source venv/Scripts/activate
+else
+    echo -e "${RED}Error: Could not find virtual environment activation script${NC}"
+    exit 1
+fi
 
 # Install/upgrade dependencies
 print_info "Checking dependencies..."
