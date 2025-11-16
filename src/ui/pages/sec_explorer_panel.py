@@ -172,17 +172,19 @@ def render():
     Render the SEC Data Explorer panel
     """
     st.markdown("## 🔍 SEC Data Explorer")
-    st.markdown("Query and download SEC filings for ABS issuers. Select companies, date ranges, and form types to explore available data.")
+    st.markdown("Query and download SEC filings for ABS issuers. Select multiple companies, date ranges, and form types to explore available data.")
 
     st.markdown("---")
 
     # Initialize session state
-    if 'selected_cik' not in st.session_state:
-        st.session_state.selected_cik = None
+    if 'selected_ciks' not in st.session_state:
+        st.session_state.selected_ciks = []
     if 'company_filings' not in st.session_state:
         st.session_state.company_filings = None
     if 'selected_filings' not in st.session_state:
         st.session_state.selected_filings = []
+    if 'custom_companies' not in st.session_state:
+        st.session_state.custom_companies = []
 
     # Company Selection Section
     st.markdown("### 🏢 Company Selection")
@@ -190,49 +192,79 @@ def render():
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        # Radio button for selection method
-        selection_method = st.radio(
-            "Selection Method",
-            ["Select from Default Companies", "Enter Custom CIK"],
-            horizontal=True
+        # Combine default and custom companies
+        all_companies = DEFAULT_COMPANIES + st.session_state.custom_companies
+
+        # Create company display options
+        company_display_options = {
+            f"{comp['name']} (CIK: {comp['cik']})": comp['cik']
+            for comp in all_companies
+        }
+
+        # Multi-select for companies
+        st.markdown("**Select Companies to Query:**")
+        selected_company_names = st.multiselect(
+            "Choose one or more companies",
+            options=list(company_display_options.keys()),
+            default=list(company_display_options.keys())[:5] if len(company_display_options) >= 5 else list(company_display_options.keys()),
+            help="Select multiple companies to query their SEC filings",
+            key="company_multiselect"
         )
 
-        if selection_method == "Select from Default Companies":
-            # Dropdown of default companies
-            company_options = [f"{comp['name']} (CIK: {comp['cik']})" for comp in DEFAULT_COMPANIES]
-            selected_company = st.selectbox(
-                "Choose a Company",
-                company_options,
-                index=0
-            )
+        # Extract CIKs from selection
+        selected_ciks = [company_display_options[name] for name in selected_company_names]
 
-            # Extract CIK from selection
-            selected_cik = selected_company.split("CIK: ")[1].rstrip(")")
+        # Option to add custom company
+        with st.expander("➕ Add Custom Company"):
+            st.markdown("Add a new company to the selection list:")
 
-            # Option to add custom company name
-            with st.expander("➕ Add Custom Company"):
-                custom_name = st.text_input("Company Name")
-                custom_cik = st.text_input("CIK Number")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                custom_name = st.text_input("Company Name", placeholder="e.g., Wells Fargo Bank", key="custom_name_input")
+            with col_b:
+                custom_cik = st.text_input("CIK Number", placeholder="e.g., 72971", key="custom_cik_input")
 
-                if st.button("Add to List"):
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("Add to List", type="primary", use_container_width=True):
                     if custom_name and custom_cik:
-                        if 'custom_companies' not in st.session_state:
-                            st.session_state.custom_companies = []
-                        st.session_state.custom_companies.append({
-                            "name": custom_name,
-                            "cik": custom_cik
-                        })
-                        st.success(f"Added {custom_name} (CIK: {custom_cik})")
-                        st.rerun()
+                        # Check if already exists
+                        existing_ciks = [comp['cik'] for comp in st.session_state.custom_companies]
+                        if custom_cik not in existing_ciks:
+                            st.session_state.custom_companies.append({
+                                "name": custom_name,
+                                "cik": custom_cik
+                            })
+                            st.success(f"✓ Added {custom_name}")
+                            st.rerun()
+                        else:
+                            st.warning("Company already exists in the list")
                     else:
                         st.error("Please provide both company name and CIK")
 
-        else:  # Enter Custom CIK
-            selected_cik = st.text_input(
+            with col_btn2:
+                if len(st.session_state.custom_companies) > 0 and st.button("Clear Custom Companies", use_container_width=True):
+                    st.session_state.custom_companies = []
+                    st.rerun()
+
+            if len(st.session_state.custom_companies) > 0:
+                st.markdown("**Custom Companies:**")
+                for comp in st.session_state.custom_companies:
+                    st.caption(f"• {comp['name']} (CIK: {comp['cik']})")
+
+        # Alternative: Direct CIK input
+        with st.expander("🔢 Enter CIK Number Directly"):
+            direct_cik = st.text_input(
                 "Enter CIK Number",
                 placeholder="e.g., 38777",
-                help="Enter the Central Index Key (CIK) for the company"
+                help="Enter a CIK directly to query without adding to the list",
+                key="direct_cik_input"
             )
+
+            if direct_cik and st.button("Add to Query", use_container_width=True):
+                if direct_cik not in selected_ciks:
+                    selected_ciks.append(direct_cik)
+                    st.success(f"✓ Added CIK {direct_cik} to query")
 
     with col2:
         st.info("""
@@ -243,6 +275,12 @@ def render():
         Find CIKs at:
         [SEC EDGAR Search](https://www.sec.gov/edgar/searchedgar/companysearch.html)
         """)
+
+        # Show selected companies summary
+        if selected_ciks:
+            st.success(f"**{len(selected_ciks)}** compan{'y' if len(selected_ciks) == 1 else 'ies'} selected")
+        else:
+            st.warning("No companies selected")
 
     st.markdown("---")
 
@@ -339,47 +377,76 @@ def render():
         if st.button("🔄 Clear Results", use_container_width=True):
             st.session_state.company_filings = None
             st.session_state.selected_filings = []
+            st.session_state.selected_ciks = []
             st.rerun()
 
     # Execute Query
-    if query_button and selected_cik:
-        with st.spinner("Querying SEC EDGAR database..."):
-            # Get company info first
-            company_info = get_company_info(selected_cik)
+    if query_button and selected_ciks:
+        all_filings = []
+        company_names = {}
 
-            if company_info:
-                st.success(f"Found company: {company_info.get('name', 'Unknown')}")
+        with st.spinner(f"Querying SEC EDGAR database for {len(selected_ciks)} compan{'y' if len(selected_ciks) == 1 else 'ies'}..."):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-                # Get filings
-                filings_df = get_company_filings(
-                    cik=selected_cik,
-                    form_types=selected_form_types,
-                    start_date=start_date.strftime('%Y-%m-%d') if isinstance(start_date, datetime) else str(start_date),
-                    end_date=end_date.strftime('%Y-%m-%d') if isinstance(end_date, datetime) else str(end_date)
-                )
+            for idx, cik in enumerate(selected_ciks):
+                status_text.text(f"Querying company {idx + 1} of {len(selected_ciks)}...")
+                progress_bar.progress((idx + 1) / len(selected_ciks))
 
-                if not filings_df.empty:
-                    # Limit results
-                    filings_df = filings_df.head(max_results)
+                # Get company info first
+                company_info = get_company_info(cik)
 
-                    # Add URLs
-                    filings_df['url'] = filings_df.apply(
-                        lambda row: get_filing_url(selected_cik, row['accessionNumber'], row['primaryDocument']),
-                        axis=1
+                if company_info:
+                    company_name = company_info.get('name', f'CIK {cik}')
+                    company_names[cik] = company_name
+
+                    # Get filings
+                    filings_df = get_company_filings(
+                        cik=cik,
+                        form_types=selected_form_types,
+                        start_date=start_date.strftime('%Y-%m-%d') if isinstance(start_date, datetime) else str(start_date),
+                        end_date=end_date.strftime('%Y-%m-%d') if isinstance(end_date, datetime) else str(end_date)
                     )
 
-                    # Format file sizes
-                    filings_df['sizeFormatted'] = filings_df['size'].apply(format_file_size)
+                    if not filings_df.empty:
+                        # Add company information
+                        filings_df['companyName'] = company_name
+                        filings_df['cik'] = cik
 
-                    st.session_state.company_filings = filings_df
-                    st.session_state.selected_cik = selected_cik
-                else:
-                    st.warning("No filings found matching your criteria. Try adjusting the filters.")
+                        # Add URLs
+                        filings_df['url'] = filings_df.apply(
+                            lambda row: get_filing_url(cik, row['accessionNumber'], row['primaryDocument']),
+                            axis=1
+                        )
+
+                        # Format file sizes
+                        filings_df['sizeFormatted'] = filings_df['size'].apply(format_file_size)
+
+                        all_filings.append(filings_df)
+
+            progress_bar.empty()
+            status_text.empty()
+
+            if all_filings:
+                # Combine all filings
+                combined_df = pd.concat(all_filings, ignore_index=True)
+
+                # Sort by filing date (most recent first)
+                combined_df = combined_df.sort_values('filingDate', ascending=False)
+
+                # Limit total results
+                combined_df = combined_df.head(max_results)
+
+                st.session_state.company_filings = combined_df
+                st.session_state.selected_ciks = selected_ciks
+                st.session_state.company_names = company_names
+
+                st.success(f"✓ Found {len(combined_df)} filings across {len(company_names)} companies")
             else:
-                st.error("Could not retrieve company information. Please check the CIK number.")
+                st.warning("No filings found matching your criteria. Try adjusting the filters.")
 
-    elif query_button and not selected_cik:
-        st.error("Please select a company or enter a CIK number.")
+    elif query_button and not selected_ciks:
+        st.error("Please select at least one company.")
 
     # Display Results
     if st.session_state.company_filings is not None and not st.session_state.company_filings.empty:
@@ -389,20 +456,24 @@ def render():
         st.markdown("### 📊 Available Filings")
 
         # Summary metrics
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
             st.metric("Total Filings", len(df))
 
         with col2:
-            unique_forms = df['form'].nunique()
-            st.metric("Unique Form Types", unique_forms)
+            unique_companies = df['companyName'].nunique() if 'companyName' in df.columns else 1
+            st.metric("Companies", unique_companies)
 
         with col3:
-            date_range_days = (pd.to_datetime(df['filingDate'].max()) - pd.to_datetime(df['filingDate'].min())).days
-            st.metric("Date Range (days)", date_range_days)
+            unique_forms = df['form'].nunique()
+            st.metric("Form Types", unique_forms)
 
         with col4:
+            date_range_days = (pd.to_datetime(df['filingDate'].max()) - pd.to_datetime(df['filingDate'].min())).days
+            st.metric("Date Range", f"{date_range_days} days")
+
+        with col5:
             total_size = df['size'].sum()
             st.metric("Total Size", format_file_size(total_size))
 
@@ -432,14 +503,69 @@ def render():
 
         st.markdown("---")
 
+        # Add filtering options
+        st.markdown("#### 🔍 Filter Results")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            # Filter by company
+            if 'companyName' in df.columns and df['companyName'].nunique() > 1:
+                company_filter = st.multiselect(
+                    "Filter by Company",
+                    options=sorted(df['companyName'].unique().tolist()),
+                    default=sorted(df['companyName'].unique().tolist()),
+                    key="company_filter"
+                )
+                if company_filter:
+                    df = df[df['companyName'].isin(company_filter)]
+
+        with col2:
+            # Filter by form type
+            if df['form'].nunique() > 1:
+                form_filter = st.multiselect(
+                    "Filter by Form Type",
+                    options=sorted(df['form'].unique().tolist()),
+                    default=sorted(df['form'].unique().tolist()),
+                    key="form_filter"
+                )
+                if form_filter:
+                    df = df[df['form'].isin(form_filter)]
+
+        with col3:
+            # Sort options
+            sort_options = {
+                "Filing Date (Newest)": ("filingDate", False),
+                "Filing Date (Oldest)": ("filingDate", True),
+                "Company Name (A-Z)": ("companyName", True) if 'companyName' in df.columns else ("form", True),
+                "Form Type (A-Z)": ("form", True),
+                "File Size (Largest)": ("size", False),
+                "File Size (Smallest)": ("size", True)
+            }
+
+            selected_sort = st.selectbox(
+                "Sort By",
+                options=list(sort_options.keys()),
+                index=0,
+                key="sort_select"
+            )
+
+            sort_col, sort_asc = sort_options[selected_sort]
+            if sort_col in df.columns:
+                df = df.sort_values(sort_col, ascending=sort_asc)
+
+        st.markdown("---")
+
         # Filings table
         st.markdown("#### 📄 Filing Details")
+
+        st.info(f"Showing {len(df)} filing(s)")
 
         # Column selection
         if show_all_columns:
             display_cols = df.columns.tolist()
         else:
-            display_cols = ['filingDate', 'form', 'primaryDocDescription', 'sizeFormatted', 'accessionNumber']
+            display_cols = ['filingDate', 'companyName', 'form', 'primaryDocDescription', 'sizeFormatted', 'accessionNumber']
             display_cols = [col for col in display_cols if col in df.columns]
 
         # Display dataframe with selection
@@ -450,9 +576,11 @@ def render():
             hide_index=True,
             column_config={
                 "filingDate": st.column_config.DateColumn("Filing Date", format="YYYY-MM-DD"),
+                "companyName": st.column_config.TextColumn("Company"),
                 "sizeFormatted": st.column_config.TextColumn("File Size"),
                 "form": st.column_config.TextColumn("Form Type"),
                 "primaryDocDescription": st.column_config.TextColumn("Description"),
+                "accessionNumber": st.column_config.TextColumn("Accession Number")
             }
         )
 
