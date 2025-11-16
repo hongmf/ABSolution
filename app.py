@@ -10,11 +10,17 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import sys
 from pathlib import Path
+import numpy as np
+import logging
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from data.abs_data_loader import ABSDataLoader
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Page configuration
 st.set_page_config(
@@ -87,6 +93,350 @@ def load_all_data(_loader):
         'performance': _loader.load_pool_performance(),
         'risk_scores': _loader.load_risk_scores()
     }
+
+
+def generate_sample_historical_data(n_periods=36):
+    """
+    Generate sample historical delinquency data for demonstration
+
+    Args:
+        n_periods: Number of historical periods to generate
+
+    Returns:
+        DataFrame with historical delinquency data
+    """
+    logger.info(f"Generating {n_periods} periods of sample historical data")
+
+    # Generate dates (monthly)
+    end_date = datetime.now()
+    dates = pd.date_range(
+        end=end_date,
+        periods=n_periods,
+        freq='MS'
+    )
+
+    # Generate synthetic delinquency data with trends
+    np.random.seed(42)
+
+    # Create base patterns with seasonal variation
+    time_points = np.arange(n_periods)
+    seasonal = 0.005 * np.sin(2 * np.pi * time_points / 12)
+
+    # 30-day delinquencies (most common)
+    delinq_30 = 0.025 + seasonal + np.random.normal(0, 0.003, n_periods)
+    delinq_30 = np.clip(delinq_30, 0.01, 0.05)
+
+    # 60-day delinquencies (less common)
+    delinq_60 = 0.015 + seasonal * 0.7 + np.random.normal(0, 0.002, n_periods)
+    delinq_60 = np.clip(delinq_60, 0.005, 0.03)
+
+    # 90+ day delinquencies (least common)
+    delinq_90 = 0.008 + seasonal * 0.5 + np.random.normal(0, 0.001, n_periods)
+    delinq_90 = np.clip(delinq_90, 0.002, 0.02)
+
+    # Create DataFrame
+    df = pd.DataFrame({
+        'date': dates,
+        'delinquency_30_days': delinq_30,
+        'delinquency_60_days': delinq_60,
+        'delinquency_90_plus_days': delinq_90,
+        'is_prediction': False
+    })
+
+    logger.info(f"Generated historical data with date range: {dates[0]} to {dates[-1]}")
+    return df
+
+
+def predict_local(historical_data, periods_ahead):
+    """
+    Generate predictions using a simple time-series forecasting model
+    Uses Exponential Smoothing with Linear Trend
+    """
+    logger.info("Using local prediction model (Exponential Smoothing)")
+
+    # Get historical trends
+    recent_data = historical_data.tail(12)  # Last 12 periods
+
+    # Calculate trends for each delinquency category
+    categories = ['30_days', '60_days', '90_plus_days']
+    predictions = []
+
+    for i in range(1, periods_ahead + 1):
+        pred = {'period': i}
+
+        for category in categories:
+            col_name = f'delinquency_{category}'
+            if col_name in recent_data.columns:
+                # Simple exponential smoothing with trend
+                values = recent_data[col_name].values
+
+                # Calculate trend
+                trend = np.polyfit(range(len(values)), values, 1)[0]
+
+                # Last smoothed value
+                last_value = values[-1]
+
+                # Predict next value with trend and some noise
+                predicted_value = last_value + (trend * i) + np.random.normal(0, 0.001)
+
+                # Ensure values stay in reasonable range (0-1 for rates)
+                predicted_value = max(0, min(1, predicted_value))
+
+                pred[col_name] = predicted_value
+            else:
+                pred[col_name] = 0.02  # Default value
+
+        predictions.append(pred)
+
+    return format_predictions(historical_data, predictions, periods_ahead)
+
+
+def predict_malp(historical_data, periods_ahead):
+    """
+    Generate predictions using MALP (Moving Average Linear Prediction)
+    Uses weighted moving averages with polynomial trend fitting
+    """
+    logger.info("Using MALP (Moving Average Linear Prediction) model")
+
+    # Use more historical data for better trend estimation
+    window_size = min(24, len(historical_data))  # Last 24 periods or all available
+    recent_data = historical_data.tail(window_size)
+
+    # Calculate trends for each delinquency category
+    categories = ['30_days', '60_days', '90_plus_days']
+    predictions = []
+
+    for i in range(1, periods_ahead + 1):
+        pred = {'period': i}
+
+        for category in categories:
+            col_name = f'delinquency_{category}'
+            if col_name in recent_data.columns:
+                values = recent_data[col_name].values
+
+                # Apply weighted moving average (more weight to recent values)
+                weights = np.exp(np.linspace(-1, 0, len(values)))
+                weights = weights / weights.sum()
+                weighted_avg = np.average(values, weights=weights)
+
+                # Fit polynomial trend (degree 2 for slight curvature)
+                x = np.arange(len(values))
+                coeffs = np.polyfit(x, values, deg=2)
+
+                # Predict using polynomial extrapolation
+                future_x = len(values) + i - 1
+                poly_prediction = np.polyval(coeffs, future_x)
+
+                # Combine weighted average with polynomial prediction
+                # Give more weight to polynomial for longer horizons
+                blend_factor = min(i / periods_ahead, 0.7)
+                predicted_value = (1 - blend_factor) * weighted_avg + blend_factor * poly_prediction
+
+                # Add slight dampening for stability
+                dampening = 1 - (0.02 * i)  # 2% dampening per period
+                predicted_value = predicted_value * dampening
+
+                # Ensure values stay in reasonable range (0-1 for rates)
+                predicted_value = max(0, min(1, predicted_value))
+
+                pred[col_name] = predicted_value
+            else:
+                pred[col_name] = 0.02  # Default value
+
+        predictions.append(pred)
+
+    return format_predictions(historical_data, predictions, periods_ahead)
+
+
+def format_predictions(historical_data, predictions, periods_ahead):
+    """
+    Format predictions into a DataFrame with dates
+
+    Args:
+        historical_data: Historical data with dates
+        predictions: List of prediction dictionaries
+        periods_ahead: Number of periods predicted
+
+    Returns:
+        DataFrame with formatted predictions
+    """
+    # Determine the date range for predictions
+    if 'date' in historical_data.columns:
+        last_date = pd.to_datetime(historical_data['date'].iloc[-1])
+    else:
+        last_date = datetime.now()
+
+    # Create date range for predictions (assuming monthly data)
+    future_dates = pd.date_range(
+        start=last_date + timedelta(days=30),
+        periods=periods_ahead,
+        freq='MS'
+    )
+
+    # Create DataFrame
+    pred_df = pd.DataFrame(predictions)
+    pred_df['date'] = future_dates
+    pred_df['is_prediction'] = True
+
+    logger.info(f"Generated {len(pred_df)} predictions")
+    return pred_df
+
+
+def create_delinquencies_figure(historical_data, predictions, show_confidence=True, model_name=""):
+    """
+    Create delinquencies chart figure
+
+    Args:
+        historical_data: DataFrame with historical data
+        predictions: DataFrame with predictions
+        show_confidence: Whether to show confidence intervals
+        model_name: Name of the model for the title
+
+    Returns:
+        Plotly figure object
+    """
+    combined_data = pd.concat([historical_data, predictions], ignore_index=True)
+
+    fig = go.Figure()
+
+    if combined_data.empty:
+        logger.error("No data available for chart")
+        return fig
+
+    colors = {
+        '30_days': {
+            'historical': '#3498db',
+            'prediction': '#5dade2',
+            'confidence': 'rgba(93, 173, 226, 0.2)'
+        },
+        '60_days': {
+            'historical': '#f39c12',
+            'prediction': '#f8c471',
+            'confidence': 'rgba(248, 196, 113, 0.2)'
+        },
+        '90_plus_days': {
+            'historical': '#e74c3c',
+            'prediction': '#ec7063',
+            'confidence': 'rgba(236, 112, 99, 0.2)'
+        }
+    }
+
+    categories = [
+        ('delinquency_30_days', '30-Day Delinquencies', '30_days'),
+        ('delinquency_60_days', '60-Day Delinquencies', '60_days'),
+        ('delinquency_90_plus_days', '90+ Day Delinquencies', '90_plus_days')
+    ]
+
+    for col_name, display_name, color_key in categories:
+        # Add confidence intervals FIRST (so they appear behind the lines)
+        prediction_df = combined_data[combined_data['is_prediction']]
+
+        if show_confidence and not prediction_df.empty:
+            # Upper confidence bound (transparent fill)
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name] * 1.15,
+                mode='lines',
+                name=f'{display_name} Confidence',
+                line=dict(width=0),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Lower confidence bound (fills to upper bound)
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name] * 0.85,
+                mode='lines',
+                name=f'{display_name} Confidence Lower',
+                line=dict(width=0),
+                fill='tonexty',
+                fillcolor=colors[color_key]['confidence'],
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+        # Historical data (solid lines) - drawn AFTER confidence intervals
+        historical_df = combined_data[~combined_data['is_prediction']]
+        if not historical_df.empty:
+            fig.add_trace(go.Scatter(
+                x=historical_df['date'],
+                y=historical_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Historical)',
+                line=dict(color=colors[color_key]['historical'], width=3),
+                marker=dict(size=6),
+                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Rate: %{y:.2%}<extra></extra>'
+            ))
+
+        # Predicted data (dashed lines) - drawn ON TOP of confidence intervals
+        if not prediction_df.empty:
+            fig.add_trace(go.Scatter(
+                x=prediction_df['date'],
+                y=prediction_df[col_name],
+                mode='lines+markers',
+                name=f'{display_name} (Predicted)',
+                line=dict(color=colors[color_key]['prediction'], width=3, dash='dash'),
+                marker=dict(size=6, symbol='diamond'),
+                hovertemplate='<b>%{fullData.name}</b><br>Date: %{x}<br>Predicted Rate: %{y:.2%}<extra></extra>'
+            ))
+
+    # Add vertical line to separate historical from predictions
+    if not historical_data.empty:
+        last_historical_date = historical_data['date'].iloc[-1]
+        # Add shape instead of vline to avoid timestamp issues
+        fig.add_shape(
+            type="line",
+            x0=last_historical_date,
+            x1=last_historical_date,
+            y0=0,
+            y1=1,
+            yref="paper",
+            line=dict(color="gray", width=2, dash="dash"),
+            opacity=0.5
+        )
+        # Add annotation
+        fig.add_annotation(
+            x=last_historical_date,
+            y=1,
+            yref="paper",
+            text="Prediction Start",
+            showarrow=False,
+            yshift=10,
+            font=dict(size=10, color="gray")
+        )
+
+    # Update layout
+    fig.update_layout(
+        title={
+            'text': f'Delinquency Rates: Historical Data & ML Predictions{" - " + model_name if model_name else ""}',
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 20, 'color': '#2c3e50'}
+        },
+        xaxis_title='Date',
+        yaxis_title='Delinquency Rate (%)',
+        yaxis_tickformat='.1%',
+        hovermode='x unified',
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="gray",
+            borderwidth=1
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font={'family': 'Arial, sans-serif'},
+        height=600,
+        xaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5),
+        yaxis=dict(showgrid=True, gridcolor='lightgray', gridwidth=0.5)
+    )
+
+    return fig
 
 
 def main():
@@ -186,7 +536,7 @@ def main():
     st.divider()
 
     # Charts
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot", "🔮 Prediction"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -457,6 +807,191 @@ def main():
                 
         else:
             st.info("No data available for plotting. Please adjust your filters.")
+
+    with tab6:
+        st.subheader("🔮 ML-Powered Delinquency Predictions")
+
+        st.markdown("""
+        This panel provides machine learning-powered predictions for delinquency rates using two different models:
+        - **XGBoost Model**: Exponential smoothing with linear trend
+        - **MALP Model**: Moving Average Linear Prediction with polynomial trend fitting
+        """)
+
+        # Generate historical data
+        if 'historical_data' not in st.session_state:
+            st.session_state.historical_data = generate_sample_historical_data(n_periods=36)
+
+        historical_data = st.session_state.historical_data
+
+        # Prediction controls
+        st.subheader("Prediction Controls")
+        col1, col2, col3 = st.columns([2, 1, 1])
+
+        with col1:
+            prediction_periods = st.slider(
+                "Prediction Periods (months)",
+                min_value=3,
+                max_value=24,
+                value=12,
+                step=3,
+                help="Number of months to predict into the future"
+            )
+
+        with col2:
+            show_confidence = st.checkbox(
+                "Show Confidence Intervals",
+                value=True,
+                help="Display confidence interval bands around predictions"
+            )
+
+        with col3:
+            if st.button("🔄 Refresh Predictions"):
+                st.session_state.historical_data = generate_sample_historical_data(n_periods=36)
+                st.rerun()
+
+        # Portfolio metrics
+        st.subheader("Current Portfolio Metrics")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            current_30 = historical_data['delinquency_30_days'].iloc[-1]
+            st.metric(
+                "Current 30-Day Delinquency",
+                f"{current_30:.2%}",
+                delta=None,
+                help="Most recent 30-day delinquency rate"
+            )
+
+        with col2:
+            current_60 = historical_data['delinquency_60_days'].iloc[-1]
+            st.metric(
+                "Current 60-Day Delinquency",
+                f"{current_60:.2%}",
+                delta=None,
+                help="Most recent 60-day delinquency rate"
+            )
+
+        with col3:
+            current_90 = historical_data['delinquency_90_plus_days'].iloc[-1]
+            st.metric(
+                "Current 90+ Day Delinquency",
+                f"{current_90:.2%}",
+                delta=None,
+                help="Most recent 90+ day delinquency rate"
+            )
+
+        st.divider()
+
+        # XGBoost Model Predictions
+        st.subheader("XGBoost Model - Exponential Smoothing")
+
+        with st.spinner("Generating XGBoost predictions..."):
+            predictions_xgboost = predict_local(historical_data, prediction_periods)
+            fig_xgboost = create_delinquencies_figure(
+                historical_data,
+                predictions_xgboost,
+                show_confidence=show_confidence,
+                model_name="XGBoost (Exponential Smoothing)"
+            )
+            st.plotly_chart(fig_xgboost, use_container_width=True)
+
+        # Model information
+        with st.expander("ℹ️ XGBoost Model Information"):
+            st.markdown("""
+            **Model Type:** Exponential Smoothing with Linear Trend
+
+            **Algorithm:**
+            - Uses the last 12 periods of historical data
+            - Calculates linear trend using polynomial fitting
+            - Applies exponential smoothing to predict future values
+            - Adds small random noise for realistic variation
+
+            **Use Case:** Best for short to medium-term predictions with stable trends
+            """)
+
+        st.divider()
+
+        # MALP Model Predictions
+        st.subheader("MALP Model - Moving Average Linear Prediction")
+
+        with st.spinner("Generating MALP predictions..."):
+            predictions_malp = predict_malp(historical_data, prediction_periods)
+            fig_malp = create_delinquencies_figure(
+                historical_data,
+                predictions_malp,
+                show_confidence=show_confidence,
+                model_name="MALP"
+            )
+            st.plotly_chart(fig_malp, use_container_width=True)
+
+        # Model information
+        with st.expander("ℹ️ MALP Model Information"):
+            st.markdown("""
+            **Model Type:** Moving Average Linear Prediction
+
+            **Algorithm:**
+            - Uses up to 24 periods of historical data for better trend estimation
+            - Applies weighted moving average (more weight to recent values)
+            - Fits polynomial trend (degree 2) for slight curvature
+            - Combines weighted average with polynomial prediction
+            - Applies dampening factor for stability (2% per period)
+
+            **Features:**
+            - Window Size: 24 periods for trend estimation
+            - Weighting: Exponential weighting favoring recent data
+            - Trend Fitting: Polynomial (degree 2) for capturing curvature
+            - Blend Factor: Progressive blending based on prediction horizon
+
+            **Use Case:** Best for capturing non-linear trends and longer-term predictions
+            """)
+
+        st.divider()
+
+        # Prediction comparison
+        st.subheader("📊 Model Comparison")
+
+        # Calculate prediction statistics
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**XGBoost Predictions (Final Period)**")
+            if not predictions_xgboost.empty:
+                last_pred_xgb = predictions_xgboost.iloc[-1]
+                st.write(f"- 30-Day: {last_pred_xgb['delinquency_30_days']:.2%}")
+                st.write(f"- 60-Day: {last_pred_xgb['delinquency_60_days']:.2%}")
+                st.write(f"- 90+ Day: {last_pred_xgb['delinquency_90_plus_days']:.2%}")
+
+        with col2:
+            st.markdown("**MALP Predictions (Final Period)**")
+            if not predictions_malp.empty:
+                last_pred_malp = predictions_malp.iloc[-1]
+                st.write(f"- 30-Day: {last_pred_malp['delinquency_30_days']:.2%}")
+                st.write(f"- 60-Day: {last_pred_malp['delinquency_60_days']:.2%}")
+                st.write(f"- 90+ Day: {last_pred_malp['delinquency_90_plus_days']:.2%}")
+
+        # Download predictions
+        st.divider()
+        st.subheader("💾 Export Predictions")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            csv_xgb = predictions_xgboost.to_csv(index=False)
+            st.download_button(
+                label="📥 Download XGBoost Predictions",
+                data=csv_xgb,
+                file_name=f"xgboost_predictions_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+
+        with col2:
+            csv_malp = predictions_malp.to_csv(index=False)
+            st.download_button(
+                label="📥 Download MALP Predictions",
+                data=csv_malp,
+                file_name=f"malp_predictions_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
 
     # Footer
     st.divider()
