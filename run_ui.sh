@@ -4,7 +4,7 @@
 echo "Starting ABSolution Streamlit UI..."
 echo "Installing dependencies..."
 
-pip install streamlit plotly altair matplotlib seaborn pandas numpy scikit-learn boto3 xgboost
+pip install streamlit plotly altair matplotlib seaborn pandas numpy scikit-learn boto3 xgboost requests
 
 echo ""
 echo "Starting Streamlit server..."
