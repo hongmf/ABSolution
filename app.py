@@ -537,7 +537,7 @@ def main():
     st.divider()
 
     # Charts
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot", "🔍 SEC Explorer"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -808,6 +808,10 @@ def main():
                 
         else:
             st.info("No data available for plotting. Please adjust your filters.")
+
+    with tab6:
+        # SEC Data Explorer Panel
+        sec_explorer_panel.render()
 
     # Footer
     st.divider()
