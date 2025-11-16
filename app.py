@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from data.abs_data_loader import ABSDataLoader
+from ui.pages import sec_explorer_panel
 
 # Page configuration
 st.set_page_config(
@@ -186,7 +187,7 @@ def main():
     st.divider()
 
     # Charts
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot", "🔍 SEC Explorer"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -457,6 +458,10 @@ def main():
                 
         else:
             st.info("No data available for plotting. Please adjust your filters.")
+
+    with tab6:
+        # SEC Data Explorer Panel
+        sec_explorer_panel.render()
 
     # Footer
     st.divider()
