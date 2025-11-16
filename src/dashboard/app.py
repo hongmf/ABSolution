@@ -407,6 +407,123 @@ app.layout = html.Div([
         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
     }),
 
+    # Security Exploration Panel
+    html.Div([
+        html.H2("🔍 Security Exploration & AI Dialogue Panel", style={
+            'color': '#34495e',
+            'fontFamily': 'Arial, sans-serif',
+            'marginBottom': '20px'
+        }),
+        html.Div([
+            html.Div([
+                html.H3("Multi-Agent AI System", style={
+                    'color': '#2c3e50',
+                    'fontSize': '20px',
+                    'marginBottom': '15px'
+                }),
+                html.P([
+                    "Interact with specialized AI agents to explore securities, analyze risk, ",
+                    "generate reports, and perform deep data analysis through a conversational interface."
+                ], style={
+                    'color': '#555',
+                    'marginBottom': '20px',
+                    'lineHeight': '1.6'
+                }),
+                html.Div([
+                    html.Div([
+                        html.Span("📊", style={'fontSize': '24px', 'marginRight': '10px'}),
+                        html.Strong("Data Analyst", style={'color': '#667eea'}),
+                        html.Span(" - Query & analyze SEC filings", style={'marginLeft': '10px'})
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Span("⚠️", style={'fontSize': '24px', 'marginRight': '10px'}),
+                        html.Strong("Risk Assessor", style={'color': '#f5576c'}),
+                        html.Span(" - Evaluate deal risk and credit quality", style={'marginLeft': '10px'})
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Span("📈", style={'fontSize': '24px', 'marginRight': '10px'}),
+                        html.Strong("Market Monitor", style={'color': '#4facfe'}),
+                        html.Span(" - Track market trends and pricing", style={'marginLeft': '10px'})
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Span("📝", style={'fontSize': '24px', 'marginRight': '10px'}),
+                        html.Strong("Report Generator", style={'color': '#43e97b'}),
+                        html.Span(" - Create comprehensive reports", style={'marginLeft': '10px'})
+                    ], style={'marginBottom': '10px'}),
+                    html.Div([
+                        html.Span("🎯", style={'fontSize': '24px', 'marginRight': '10px'}),
+                        html.Strong("Coordinator", style={'color': '#fa709a'}),
+                        html.Span(" - Orchestrate multi-agent workflows", style={'marginLeft': '10px'})
+                    ], style={'marginBottom': '10px'}),
+                ], style={
+                    'backgroundColor': '#f8f9fa',
+                    'padding': '20px',
+                    'borderRadius': '8px',
+                    'marginBottom': '25px'
+                }),
+            ], style={'width': '60%', 'display': 'inline-block', 'verticalAlign': 'top', 'paddingRight': '30px'}),
+
+            html.Div([
+                html.H3("Quick Start", style={
+                    'color': '#2c3e50',
+                    'fontSize': '20px',
+                    'marginBottom': '15px'
+                }),
+                html.Div([
+                    html.P("1. Start the dialogue panel server:", style={'marginBottom': '10px', 'fontWeight': 'bold'}),
+                    html.Pre("python3 scripts/serve_ui.py", style={
+                        'backgroundColor': '#1e1e1e',
+                        'color': '#00ff00',
+                        'padding': '15px',
+                        'borderRadius': '5px',
+                        'fontFamily': 'monospace',
+                        'fontSize': '14px',
+                        'marginBottom': '20px',
+                        'overflowX': 'auto'
+                    }),
+                    html.P("2. Open the interface:", style={'marginBottom': '10px', 'fontWeight': 'bold'}),
+                    html.A(
+                        "🌐 Launch Dialogue Panel (http://localhost:8080)",
+                        href="http://localhost:8080",
+                        target="_blank",
+                        style={
+                            'display': 'inline-block',
+                            'backgroundColor': '#3498db',
+                            'color': 'white',
+                            'padding': '12px 24px',
+                            'borderRadius': '6px',
+                            'textDecoration': 'none',
+                            'fontWeight': 'bold',
+                            'marginBottom': '20px',
+                            'transition': 'background-color 0.3s'
+                        }
+                    ),
+                    html.P([
+                        html.Strong("Documentation: "),
+                        html.A(
+                            "View Dialogue Panel Guide",
+                            href="/docs/dialogue_panel_guide.md",
+                            target="_blank",
+                            style={'color': '#3498db'}
+                        )
+                    ], style={'marginTop': '15px', 'color': '#666'})
+                ], style={
+                    'backgroundColor': '#fff9e6',
+                    'padding': '20px',
+                    'borderRadius': '8px',
+                    'border': '2px solid #ffd966'
+                })
+            ], style={'width': '38%', 'display': 'inline-block', 'verticalAlign': 'top'})
+        ])
+    ], style={
+        'backgroundColor': 'white',
+        'padding': '30px',
+        'margin': '20px',
+        'borderRadius': '10px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+        'border': '2px solid #3498db'
+    }),
+
     # Footer
     html.Div([
         html.P("© 2024 ABSolution | Powered by AWS SageMaker, Kinesis, Athena, QuickSight",
