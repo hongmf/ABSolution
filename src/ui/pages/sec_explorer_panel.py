@@ -23,8 +23,8 @@ DEFAULT_COMPANIES = [
     {"name": "Ford Motor Credit Company", "cik": "38777"},
     {"name": "GM Financial Company", "cik": "1576940"},
     {"name": "Santander Consumer USA Holdings", "cik": "1548429"},
-    {"name": "Capital One Financial Corporation", "cik": "927628"},
-    {"name": "American Express Company", "cik": "4962"},
+    {"name": "Nissan Motor Acceptance Corporation", "cik": "1680379"},
+    {"name": "Toyota Motor Credit Corporation", "cik": "1480786"},
 ]
 
 # ABS-related form types
