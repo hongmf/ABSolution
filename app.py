@@ -17,7 +17,7 @@ import logging
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from data.abs_data_loader import ABSDataLoader
-from ui.pages import sec_explorer_panel
+from ui.pages import sec_explorer_panel, prediction_panel
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -537,7 +537,7 @@ def main():
     st.divider()
 
     # Charts
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot", "🔍 SEC Explorer"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📊 Overview", "🏢 Issuers", "⚠️ Risk Analysis", "📋 Raw Data", "📈 Plot", "🔍 SEC Explorer", "🔮 Prediction"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -812,6 +812,10 @@ def main():
     with tab6:
         # SEC Data Explorer Panel
         sec_explorer_panel.render()
+
+    with tab7:
+        # Prediction Panel
+        prediction_panel.render()
 
     # Footer
     st.divider()
